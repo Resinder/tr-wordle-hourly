@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Sabitler ve Değişkenler ---
     const WORD_LENGTH = 5;
     const MAX_GUESSES = 6;
-    const ANIMATION_DURATION = 300; // Her kutunun flip süresi
+    const ANIMATION_DURATION = 300; 
     const kelimelerGistURL = 'https://gist.githubusercontent.com/Resinder/b2897fd639006e34a1bf54252d730f7b/raw/b29034e404094142bfeb896e7e8e5aa50b6db46f/tdk-5-harfli-kelimeler.json';
     const gizliKelimeURL = 'gizli-kelime.json';
 
@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let mevcutSatir = 0;
     let mevcutKaro = 0;
     let oyunBitti = false;
+    let guesses = []; // LocalStorage takibi için
 
     const gameBoard = document.getElementById('game-board');
     const klavye = document.getElementById('keyboard');
@@ -19,170 +20,89 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Başlangıç Fonksiyonları ---
     async function init() {
-        console.log('🎮 Oyun başlatılıyor...');
-        
+        console.log('🎮 Oyun optimize edilmiş modda başlatılıyor...');
         try {
-            // Önce oyun tahtasını oluştur
             oyunTahtasiniOlustur();
-            console.log('✅ Oyun tahtası oluşturuldu');
             
-            // Gizli kelimeyi yükle (cache bypass)
-            const cacheBuster = `?t=${Date.now()}`;
-            console.log('📥 Gizli kelime yükleniyor...');
-            
+            // Gizli kelimeyi yükle (Saatlik Cache Bypass)
+            const cacheBuster = `?t=${Math.floor(Date.now() / 3600000)}`;
             const gizliKelimeResponse = await fetch(gizliKelimeURL + cacheBuster);
-            
-            if (!gizliKelimeResponse.ok) {
-                throw new Error("Gizli kelime dosyası bulunamadı. GitHub Actions henüz çalışmamış olabilir.");
-            }
+            if (!gizliKelimeResponse.ok) throw new Error("Kelime dosyası bulunamadı.");
 
-            const gizliKelimeText = await gizliKelimeResponse.text();
-            
-            if (!gizliKelimeText || gizliKelimeText.trim() === '') {
-                throw new Error("Gizli kelime dosyası boş. Lütfen birkaç dakika bekleyip tekrar deneyin.");
-            }
-
-            let gizliKelimeData;
-            try {
-                gizliKelimeData = JSON.parse(gizliKelimeText);
-            } catch (parseError) {
-                console.error('JSON Parse Error:', parseError);
-                throw new Error("Gizli kelime dosyası geçersiz.");
-            }
-
-            if (!gizliKelimeData.kelime) {
-                throw new Error("Gizli kelime dosyasında 'kelime' alanı bulunamadı.");
-            }
-
+            const gizliKelimeData = await gizliKelimeResponse.json();
             hedefKelime = gizliKelimeData.kelime.toLocaleUpperCase('tr-TR').trim();
-            console.log(`✅ Hedef kelime yüklendi (${hedefKelime.length} harf)`);
 
-            if (hedefKelime.length !== WORD_LENGTH) {
-                throw new Error(`Kelime ${WORD_LENGTH} harfli olmalı.`);
+            // Sözlük listesini yükle
+            const kelimelerResponse = await fetch(kelimelerGistURL);
+            if (kelimelerResponse.ok) {
+                const liste = await kelimelerResponse.json();
+                kelimeler = liste.map(k => k.toLocaleLowerCase('tr-TR').trim());
             }
 
-            // Kelime listesini yükle
-            try {
-                console.log('📥 Kelime listesi yükleniyor...');
-                const kelimelerResponse = await fetch(kelimelerGistURL);
-                if (kelimelerResponse.ok) {
-                    kelimeler = await kelimelerResponse.json();
-                    kelimeler = kelimeler.map(k => k.toLowerCase().trim());
-                    console.log(`✅ ${kelimeler.length} kelime yüklendi`);
-                }
-            } catch (error) {
-                console.warn("⚠️ Kelime listesi yüklenemedi, tüm tahminler kabul edilecek.");
-            }
-            
             klavyeOlayDinleyicileriEkle();
             geriSayimiBaslat();
             
-            console.log('🎉 Oyun hazır!');
-            
-            // Sadece localhost'ta kelimeyi göster
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                console.log(`🎯 Hedef Kelime: ${hedefKelime}`);
-            }
-            
+            // Mevcut saatteki ilerlemeyi geri yükle
+            await loadGameState();
+
         } catch (error) {
-            console.error("❌ Oyun başlatma hatası:", error);
-            gameBoard.innerHTML = `
-                <div style="color: white; text-align: center; padding: 40px 20px; max-width: 400px;">
-                    <div style="font-size: 64px; margin-bottom: 20px;">😔</div>
-                    <h2 style="font-size: 24px; margin-bottom: 16px; font-weight: 700;">Oyun Yüklenemedi</h2>
-                    <p style="font-size: 16px; color: #9ca3af; margin-bottom: 24px; line-height: 1.6;">${error.message}</p>
-                    <button onclick="location.reload()" style="padding: 14px 32px; font-size: 16px; cursor: pointer; background: linear-gradient(135deg, #6aaa64 0%, #5a9a54 100%); color: white; border: none; border-radius: 8px; font-weight: 700; box-shadow: 0 4px 12px rgba(106, 170, 100, 0.4); transition: all 0.2s;">
-                        🔄 Sayfayı Yenile
-                    </button>
-                </div>
-            `;
+            console.error("❌ Başlatma Hatası:", error);
+            renderErrorUI(error.message);
         }
     }
 
-    function geriSayimiBaslat() {
-        const guncelle = () => {
-            const simdi = new Date();
-            const sonrakiSaat = new Date(simdi);
-            sonrakiSaat.setHours(simdi.getHours() + 1, 0, 0, 0);
-            
-            const fark = sonrakiSaat - simdi;
-            const dakika = Math.floor((fark % (1000 * 60 * 60)) / (1000 * 60));
-            const saniye = Math.floor((fark % (1000 * 60)) / 1000);
-
-            if (timerSpan) {
-                timerSpan.textContent = `${String(dakika).padStart(2, '0')}:${String(saniye).padStart(2, '0')}`;
-            }
+    // --- Local Storage (Kayıt Sistemi) ---
+    function saveGameState() {
+        const state = {
+            target: hedefKelime,
+            guesses: guesses,
+            hour: new Date().getHours(),
+            date: new Date().toDateString()
         };
-
-        guncelle();
-        setInterval(guncelle, 1000);
+        localStorage.setItem('tr-wordle-hourly-state', JSON.stringify(state));
     }
 
-    // --- Oyun Tahtası ve Arayüz ---
-    function oyunTahtasiniOlustur() {
-        if (!gameBoard) {
-            console.error('❌ gameBoard elementi bulunamadı!');
+    async function loadGameState() {
+        const saved = localStorage.getItem('tr-wordle-hourly-state');
+        if (!saved) return;
+
+        const state = JSON.parse(saved);
+        const now = new Date();
+
+        // Eğer saat veya gün değişmişse eski kaydı temizle
+        if (state.hour !== now.getHours() || state.date !== now.toDateString() || state.target !== hedefKelime) {
+            localStorage.removeItem('tr-wordle-hourly-state');
             return;
         }
-        
-        gameBoard.innerHTML = '';
-        
-        for (let i = 0; i < MAX_GUESSES; i++) {
-            const satirDiv = document.createElement('div');
-            satirDiv.classList.add('row');
-            satirDiv.id = `row-${i}`;
-            
-            for (let j = 0; j < WORD_LENGTH; j++) {
-                const karoDiv = document.createElement('div');
-                karoDiv.classList.add('tile');
-                karoDiv.id = `tile-${i}-${j}`;
-                satirDiv.appendChild(karoDiv);
-            }
-            
-            gameBoard.appendChild(satirDiv);
-        }
-        
-        console.log(`✅ ${MAX_GUESSES}x${WORD_LENGTH} oyun tahtası oluşturuldu`);
-    }
 
-    function mesajGoster(text, duration = 2000) {
-        if (!messageContainer) return;
-        
-        const mesajDiv = document.createElement('div');
-        mesajDiv.classList.add('message');
-        mesajDiv.textContent = text;
-        messageContainer.appendChild(mesajDiv);
-        
-        setTimeout(() => {
-            mesajDiv.classList.add('show');
-        }, 10);
-        
-        setTimeout(() => {
-            mesajDiv.classList.remove('show');
-            setTimeout(() => {
-                mesajDiv.remove();
-            }, 300);
-        }, duration);
+        // Eski tahminleri sessizce doldur
+        for (const guess of state.guesses) {
+            for (const char of guess) {
+                harfEkle(char, true); // true: sessiz ekleme
+            }
+            await tahminiGonder(true); // true: yükleme modu
+        }
     }
 
     // --- Oyun Mantığı ---
-    function harfEkle(harf) {
+    function harfEkle(harf, silent = false) {
         if (oyunBitti || mevcutKaro >= WORD_LENGTH) return;
-        
-        // Türkçe karakterleri büyük harfe çevir
         const turkceHarf = harf.toLocaleUpperCase('tr-TR');
-        
         const karo = document.getElementById(`tile-${mevcutSatir}-${mevcutKaro}`);
         if (karo) {
             karo.textContent = turkceHarf;
             karo.classList.add('filled');
+            if (!silent) {
+                karo.style.animation = 'none';
+                karo.offsetHeight; // reflow
+                karo.style.animation = 'pop 0.1s ease-in-out';
+            }
             mevcutKaro++;
         }
     }
 
     function harfSil() {
         if (oyunBitti || mevcutKaro <= 0) return;
-        
         mevcutKaro--;
         const karo = document.getElementById(`tile-${mevcutSatir}-${mevcutKaro}`);
         if (karo) {
@@ -191,194 +111,188 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function tahminiGonder() {
-        if (oyunBitti) return;
-        
-        if (mevcutKaro !== WORD_LENGTH) {
-            mesajGoster('Yeterli harf yok');
-            shakeRow(mevcutSatir);
-            return;
-        }
-
-        // Tahmini topla
-        const tahmin = [];
-        for (let i = 0; i < WORD_LENGTH; i++) {
-            const karo = document.getElementById(`tile-${mevcutSatir}-${i}`);
-            if (karo && karo.textContent) {
-                tahmin.push(karo.textContent);
+    async function tahminiGonder(isLoading = false) {
+        if (oyunBitti || mevcutKaro !== WORD_LENGTH) {
+            if (!isLoading && mevcutKaro !== WORD_LENGTH) {
+                mesajGoster('Yeterli harf yok');
+                shakeRow(mevcutSatir);
             }
-        }
-        
-        if (tahmin.length !== WORD_LENGTH) {
-            console.error('❌ Tahmin uzunluğu hatalı:', tahmin);
             return;
         }
-        
-        const tahminString = tahmin.join('');
-        
-        console.log('🔍 Tahmin:', tahminString);
-        console.log('🎯 Hedef:', hedefKelime);
 
-        // Kelime kontrolü (normalize edilmiş şekilde)
-        const normalizedTahmin = tahminString.toLocaleLowerCase('tr-TR');
-        if (kelimeler.length > 0 && !kelimeler.includes(normalizedTahmin)) {
-            console.log('❌ Kelime listede yok:', normalizedTahmin);
-            mesajGoster('Listede böyle bir kelime yok');
+        const tahmin = Array.from({length: WORD_LENGTH}, (_, i) => 
+            document.getElementById(`tile-${mevcutSatir}-${i}`).textContent
+        ).join('');
+
+        const normalizedTahmin = tahmin.toLocaleLowerCase('tr-TR');
+        
+        // Sözlük kontrolü (Yükleme aşamasında yapılmaz)
+        if (!isLoading && kelimeler.length > 0 && !kelimeler.includes(normalizedTahmin)) {
+            mesajGoster('Sözlükte yok');
             shakeRow(mevcutSatir);
             return;
         }
+
+        if (!isLoading) {
+            guesses.push(tahmin);
+            saveGameState();
+        }
+
+        await tahminiIsle(tahmin, isLoading);
         
-        // Tahmini işle ve animasyonların bitmesini bekle
-        await tahminiIsle(tahminString);
-        
-        // Kazanma kontrolü
-        if (tahminString === hedefKelime) {
+        if (tahmin === hedefKelime) {
             oyunBitti = true;
-            mesajGoster('🎉 Tebrikler! Kelimeyi buldunuz!', 5000);
+            if (!isLoading) mesajGoster('🎉 Harika!', 5000);
             celebrateWin();
             return;
         }
 
-        // Kaybetme kontrolü ÖNCE
         if (mevcutSatir + 1 >= MAX_GUESSES) {
             oyunBitti = true;
-            mesajGoster(`😔 Oyun Bitti! Kelime: ${hedefKelime}`, 5000);
+            if (!isLoading) mesajGoster(`😔 Kelime: ${hedefKelime}`, 5000);
             return;
         }
 
-        // Bir sonraki satıra geç (sadece oyun devam ediyorsa)
         mevcutSatir++;
         mevcutKaro = 0;
     }
-    
-    function shakeRow(rowIndex) {
-        const row = document.getElementById(`row-${rowIndex}`);
-        if (row) {
-            row.classList.add('shake');
+
+    async function tahminiIsle(tahmin, isLoading) {
+        const row = document.getElementById(`row-${mevcutSatir}`);
+        const tiles = Array.from(row.children);
+        const hedefHarfler = hedefKelime.split('');
+        const sonuc = new Array(WORD_LENGTH).fill('absent');
+        const harfHavuzu = {};
+
+        // Harf sayılarını hesapla (Çift harf mantığı için)
+        hedefHarfler.forEach(h => harfHavuzu[h] = (harfHavuzu[h] || 0) + 1);
+
+        // 1. Adım: Tam eşleşmeler (Yeşil)
+        tahmin.split('').forEach((h, i) => {
+            if (h === hedefHarfler[i]) {
+                sonuc[i] = 'correct';
+                harfHavuzu[h]--;
+            }
+        });
+
+        // 2. Adım: Var olan ama yanlış yerdeki harfler (Sarı)
+        tahmin.split('').forEach((h, i) => {
+            if (sonuc[i] !== 'correct' && harfHavuzu[h] > 0 && hedefHarfler.includes(h)) {
+                sonuc[i] = 'present';
+                harfHavuzu[h]--;
+            }
+        });
+
+        // Animasyon ve Renklendirme
+        for (let i = 0; i < WORD_LENGTH; i++) {
+            const tile = tiles[i];
+            if (!isLoading) await new Promise(r => setTimeout(r, ANIMATION_DURATION));
+            
+            tile.classList.add('flip');
             setTimeout(() => {
-                row.classList.remove('shake');
-            }, 500);
+                tile.classList.add(sonuc[i]);
+                klavyeGuncelle(tahmin[i], sonuc[i]);
+            }, 250);
         }
+
+        if (!isLoading) await new Promise(r => setTimeout(r, 500));
+    }
+
+    function klavyeGuncelle(harf, durum) {
+        const key = document.querySelector(`[data-key="${harf}"]`);
+        if (!key) return;
+
+        if (durum === 'correct') {
+            key.className = 'key correct';
+        } else if (durum === 'present' && !key.classList.contains('correct')) {
+            key.className = 'key present';
+        } else if (durum === 'absent' && !key.classList.contains('correct') && !key.classList.contains('present')) {
+            key.className = 'key absent';
+        }
+    }
+
+    // --- Arayüz ve Yardımcılar ---
+    function oyunTahtasiniOlustur() {
+        gameBoard.innerHTML = '';
+        for (let i = 0; i < MAX_GUESSES; i++) {
+            const row = document.createElement('div');
+            row.className = 'row';
+            row.id = `row-${i}`;
+            for (let j = 0; j < WORD_LENGTH; j++) {
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.id = `tile-${i}-${j}`;
+                row.appendChild(tile);
+            }
+            gameBoard.appendChild(row);
+        }
+    }
+
+    function klavyeOlayDinleyicileriEkle() {
+        // Fiziksel Klavye + Ekrandaki tuş animasyonu senkronu
+        document.addEventListener('keydown', (e) => {
+            if (oyunBitti) return;
+            const key = e.key === 'Enter' ? 'ENTER' : e.key === 'Backspace' ? 'BACKSPACE' : e.key.toLocaleUpperCase('tr-TR');
+            
+            // Ekrandaki tuşu bul ve "active" efekti ver
+            const visualKey = document.querySelector(`[data-key="${key}"]`);
+            if (visualKey) {
+                visualKey.classList.add('active');
+                setTimeout(() => visualKey.classList.remove('active'), 100);
+            }
+
+            if (key === 'ENTER') tahminiGonder();
+            else if (key === 'BACKSPACE') harfSil();
+            else if (/^[A-ZÇĞİÖŞÜ]$/.test(key)) harfEkle(key);
+        });
+
+        // Ekran Klavyesi
+        klavye.addEventListener('click', (e) => {
+            const btn = e.target.closest('button');
+            if (!btn || oyunBitti) return;
+            const key = btn.dataset.key;
+            if (key === 'ENTER') tahminiGonder();
+            else if (key === 'BACKSPACE') harfSil();
+            else harfEkle(key);
+        });
+    }
+
+    function geriSayimiBaslat() {
+        const update = () => {
+            const now = new Date();
+            const diff = new Date(now).setHours(now.getHours() + 1, 0, 0, 0) - now;
+            const m = Math.floor((diff % 3600000) / 60000);
+            const s = Math.floor((diff % 60000) / 1000);
+            if (timerSpan) timerSpan.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        };
+        update();
+        setInterval(update, 1000);
+    }
+
+    function mesajGoster(t, d = 2000) {
+        const m = document.createElement('div');
+        m.className = 'message show';
+        m.textContent = t;
+        messageContainer.appendChild(m);
+        setTimeout(() => { m.classList.remove('show'); setTimeout(() => m.remove(), 300); }, d);
+    }
+
+    function shakeRow(i) {
+        const r = document.getElementById(`row-${i}`);
+        r.classList.add('shake');
+        setTimeout(() => r.classList.remove('shake'), 500);
     }
 
     function celebrateWin() {
-        for (let i = 0; i < WORD_LENGTH; i++) {
-            const karo = document.getElementById(`tile-${mevcutSatir}-${i}`);
-            if (karo) {
-                setTimeout(() => {
-                    karo.classList.add('bounce');
-                }, i * 100);
-            }
-        }
-    }
-
-    async function tahminiIsle(tahmin) {
-        const hedefHarfler = hedefKelime.split('');
-        const tahminHarfleri = tahmin.split('');
-        const sonuc = new Array(WORD_LENGTH).fill('absent');
-        const hedefKullanilanlar = new Array(WORD_LENGTH).fill(false);
-
-        // 1. Önce doğru pozisyondakileri işaretle (yeşil)
-        for (let i = 0; i < WORD_LENGTH; i++) {
-            if (tahminHarfleri[i] === hedefHarfler[i]) {
-                sonuc[i] = 'correct';
-                hedefKullanilanlar[i] = true;
-            }
-        }
-
-        // 2. Sonra yanlış pozisyondakileri işaretle (sarı)
-        for (let i = 0; i < WORD_LENGTH; i++) {
-            if (sonuc[i] === 'absent') {
-                for (let j = 0; j < WORD_LENGTH; j++) {
-                    if (!hedefKullanilanlar[j] && tahminHarfleri[i] === hedefHarfler[j]) {
-                        sonuc[i] = 'present';
-                        hedefKullanilanlar[j] = true;
-                        break;
-                    }
-                }
-            }
-        }
-
-        // 3. Karoları sırayla renklendir
-        for (let i = 0; i < WORD_LENGTH; i++) {
-            const karo = document.getElementById(`tile-${mevcutSatir}-${i}`);
-            const key = document.querySelector(`[data-key="${tahminHarfleri[i]}"]`);
-            
-            setTimeout(() => {
-                if (karo) {
-                    karo.classList.add('flip');
-                    
-                    setTimeout(() => {
-                        karo.classList.add(sonuc[i]);
-                        karo.classList.remove('flip');
-                    }, 250);
-                }
-                
-                // Klavyeyi güncelle (doğru öncelik sırası)
-                if (key) {
-                    if (sonuc[i] === 'correct') {
-                        key.classList.remove('present', 'absent');
-                        key.classList.add('correct');
-                    } else if (sonuc[i] === 'present' && !key.classList.contains('correct')) {
-                        key.classList.remove('absent');
-                        key.classList.add('present');
-                    } else if (sonuc[i] === 'absent' && !key.classList.contains('correct') && !key.classList.contains('present')) {
-                        key.classList.add('absent');
-                    }
-                }
-            }, i * ANIMATION_DURATION);
-        }
-
-        // Tüm animasyonların bitmesini bekle
-        return new Promise(resolve => {
-            setTimeout(resolve, WORD_LENGTH * ANIMATION_DURATION + 500);
+        const r = document.getElementById(`row-${mevcutSatir}`);
+        Array.from(r.children).forEach((t, i) => {
+            setTimeout(() => t.classList.add('bounce'), i * 100);
         });
     }
 
-    // --- Olay Dinleyicileri ---
-    function klavyeOlayDinleyicileriEkle() {
-        // Fiziksel klavye
-        document.addEventListener('keydown', (e) => {
-            if (oyunBitti) return;
-            
-            if (e.key === 'Enter') {
-                tahminiGonder();
-            } else if (e.key === 'Backspace') {
-                harfSil();
-            } else if (/^[a-zA-ZğĞıİöÖşŞüÜçÇ]$/.test(e.key)) {
-                // Türkçe karakterleri doğru şekilde büyük harfe çevir
-                harfEkle(e.key.toLocaleUpperCase('tr-TR'));
-            }
-        });
-
-        // Ekran klavyesi
-        if (klavye) {
-            klavye.addEventListener('click', (e) => {
-                if (oyunBitti) return;
-
-                const tus = e.target.closest('button');
-                if (!tus) return;
-
-                const key = tus.dataset.key;
-                
-                // Tuş animasyonu
-                tus.classList.add('active');
-                setTimeout(() => {
-                    tus.classList.remove('active');
-                }, 100);
-                
-                if (key === 'ENTER') {
-                    tahminiGonder();
-                } else if (key === 'BACKSPACE') {
-                    harfSil();
-                } else if (key) {
-                    // Türkçe karakterleri doğru şekilde büyük harfe çevir
-                    harfEkle(key.toLocaleUpperCase('tr-TR'));
-                }
-            });
-        }
+    function renderErrorUI(msg) {
+        gameBoard.innerHTML = `<div class="error-container"><h2>😟 Hata</h2><p>${msg}</p><button onclick="location.reload()">Yenile</button></div>`;
     }
 
-    // Oyunu Başlat
     init();
 });

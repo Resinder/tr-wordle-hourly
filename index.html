@@ -2,28 +2,40 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Her saat başı yeni kelime ile Türkçe Wordle oyunu">
-    <meta name="keywords" content="wordle, türkçe wordle, kelime oyunu, puzzle">
-    <title>Türkçe Wordle - Saatlik</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <title>Türkçe Wordle - Her Saat Yeni Kelime</title>
+    <meta name="description" content="Saatlik yenilenen kelimelerle Türkçe Wordle heyecanı! Kelimeyi 6 denemede bulabilir misin?">
+    <meta name="keywords" content="wordle, türkçe wordle, kelime oyunu, saatlik wordle, oyun">
+    
+    <meta property="og:title" content="Türkçe Wordle - Saatlik">
+    <meta property="og:description" content="Her saat başı yeni bir kelime seni bekliyor.">
+    <meta property="og:type" content="website">
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🟩</text></svg>">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>TÜRKÇE WORDLE</h1>
-            <div id="timer">Yeni kelimeye: <span>--:--</span></div>
+            <div class="logo">
+                <h1>TÜRKÇE <span class="highlight">WORDLE</span></h1>
+            </div>
+            <div id="timer" aria-live="polite">
+                Yeni kelimeye: <span>--:--</span>
+            </div>
         </header>
 
         <div id="message-container"></div>
 
-        <div id="game-board"></div>
+        <main id="game-board" aria-label="Oyun Tahtası"></main>
 
-        <div id="keyboard">
+        <nav id="keyboard" aria-label="Sanal Klavye">
             <div class="keyboard-row">
                 <button class="key" data-key="E">E</button>
                 <button class="key" data-key="R">R</button>
@@ -59,9 +71,9 @@
                 <button class="key" data-key="M">M</button>
                 <button class="key" data-key="Ö">Ö</button>
                 <button class="key" data-key="Ç">Ç</button>
-                <button class="key wide" data-key="BACKSPACE">⌫</button>
+                <button class="key wide" data-key="BACKSPACE" aria-label="Sil">⌫</button>
             </div>
-        </div>
+        </nav>
     </div>
 
     <script src="script.js"></script>

@@ -1,10 +1,15 @@
-name: Update Hourly Word & Deploy
+name: Hourly Word (Reliable Check) & Deploy
 
 on:
   schedule:
-    # Tam saat başında değil, 5 geçe çalıştırıyoruz (Yoğunluktan kaçınmak için)
-    - cron: '5 * * * *' 
+    # Her 5 dakikada bir kontrol eder
+    - cron: '*/5 * * * *' 
   workflow_dispatch:
+
+# Çakışmaları önlemek için aynı anda sadece bir işin çalışmasını sağlar
+concurrency:
+  group: "word-update"
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -12,84 +17,100 @@ permissions:
   id-token: write
 
 jobs:
-  update-and-deploy:
+  check-and-update:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Tüm geçmişi çekerek git işlemlerini garantiye alır
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Select New Word
-        # 'fetch' kullanarak daha modern ve hata yakalaması kolay bir yapıya geçtik
+      - name: Process Word Update
+        id: update_step
         run: |
           node << 'EOF'
           const fs = require('fs');
           
-          async function updateWord() {
+          async function start() {
             const GIST_URL = "https://gist.githubusercontent.com/Resinder/b2897fd639006e34a1bf54252d730f7b/raw/b29034e404094142bfeb896e7e8e5aa50b6db46f/tdk-5-harfli-kelimeler.json";
             const FILE_NAME = 'gizli-kelime.json';
+            
+            const now = new Date();
+            // "YYYY-MM-DD-HH" formatında bir anahtar oluşturuyoruz
+            const currentHourKey = `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}-${now.getUTCHours()}`;
 
             try {
-              const response = await fetch(GIST_URL);
-              if (!response.ok) throw new Error(`HTTP Hata: ${response.status}`);
-              const kelimeler = await response.json();
-
-              let eskiKelime = "";
+              let data = { kelime: "", hourKey: "" };
+              
               if (fs.existsSync(FILE_NAME)) {
                 try {
-                  eskiKelime = JSON.parse(fs.readFileSync(FILE_NAME, 'utf-8')).kelime;
-                } catch (e) { console.log("Eski dosya okunamadı."); }
+                  data = JSON.parse(fs.readFileSync(FILE_NAME, 'utf-8'));
+                } catch (e) { console.log("Dosya bozuk, sıfırlanıyor."); }
               }
 
+              // KONTROL: Eğer hourKey eşleşiyorsa bu saatte zaten işlem yapılmış demektir
+              if (data.hourKey === currentHourKey) {
+                console.log(`>>> ${currentHourKey} saati için zaten güncel. İşlem yapılmıyor.`);
+                process.exit(0); 
+              }
+
+              console.log(`>>> Yeni saat algılandı (${currentHourKey}). Kelime çekiliyor...`);
+              
+              // Retry (Yeniden Deneme) Mekanizması
+              let response;
+              for (let i = 0; i < 3; i++) {
+                try {
+                  response = await fetch(GIST_URL);
+                  if (response.ok) break;
+                } catch (e) { if (i === 2) throw e; }
+              }
+
+              const kelimeler = await response.json();
               let yeniKelime;
               do {
                 yeniKelime = kelimeler[Math.floor(Math.random() * kelimeler.length)].toLocaleUpperCase('tr-TR');
-              } while (yeniKelime === eskiKelime && kelimeler.length > 1);
+              } while (yeniKelime === data.kelime && kelimeler.length > 1);
 
-              const data = {
+              const output = {
                 kelime: yeniKelime,
-                saat: new Date().toISOString(),
-                timestamp: Date.now()
+                saat: now.toISOString(),
+                timestamp: now.getTime(),
+                hourKey: currentHourKey // Bir sonraki kontroller için anahtar
               };
 
-              fs.writeFileSync(FILE_NAME, JSON.stringify(data, null, 2));
-              console.log(`✅ Güncellendi: ${yeniKelime}`);
-            } catch (error) {
-              console.error("Kritik Hata:", error.message);
+              fs.writeFileSync(FILE_NAME, JSON.stringify(output, null, 2));
+              console.log(`>>> BAŞARILI: Yeni kelime "${yeniKelime}"`);
+            } catch (err) {
+              console.error(">>> KRİTİK HATA:", err.message);
               process.exit(1);
             }
           }
-
-          updateWord();
+          start();
           EOF
 
-      - name: Commit and push changes
+      - name: Commit and Push
         run: |
           git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local woman.email "github-actions[bot]@users.noreply.github.com"
           git add gizli-kelime.json
           if ! git diff --cached --quiet; then
-            git commit -m "🔄 Otomatik Güncelleme: $(date -u +'%Y-%m-%d %H:%M UTC')"
-            git push
-          else
-            echo "Değişiklik yok."
+            git commit -m "🔄 Kelime Güncellendi: $(date -u +'%Y-%m-%d %H:00 UTC')"
+            git push origin main
           fi
 
-      # ALDIĞIN TIMEOUT HATASINI ÇÖZEN OTOMATİK DEPLOYMENT KISMI
-      - name: Setup Pages
+      - name: Deployment Setup
+        if: success()
         uses: actions/configure-pages@v4
 
-      - name: Upload artifact
+      - name: Upload Artifacts
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.' # Tüm kök dizini yükle
+          path: '.'
 
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
-        with:
-          # Bağlantı hatalarına karşı otomatik yeniden deneme (timeout koruması)
-          timeout: 60000

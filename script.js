@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error("Gizli kelime dosyasında 'kelime' alanı bulunamadı.");
             }
 
-            hedefKelime = gizliKelimeData.kelime.toUpperCase().trim();
+            hedefKelime = gizliKelimeData.kelime.toLocaleUpperCase('tr-TR').trim();
             console.log(`✅ Hedef kelime yüklendi (${hedefKelime.length} harf)`);
 
             if (hedefKelime.length !== WORD_LENGTH) {
@@ -169,9 +169,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function harfEkle(harf) {
         if (oyunBitti || mevcutKaro >= WORD_LENGTH) return;
         
+        // Türkçe karakterleri büyük harfe çevir
+        const turkceHarf = harf.toLocaleUpperCase('tr-TR');
+        
         const karo = document.getElementById(`tile-${mevcutSatir}-${mevcutKaro}`);
         if (karo) {
-            karo.textContent = harf;
+            karo.textContent = turkceHarf;
             karo.classList.add('filled');
             mevcutKaro++;
         }
@@ -212,9 +215,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         const tahminString = tahmin.join('');
+        
+        console.log('🔍 Tahmin:', tahminString);
+        console.log('🎯 Hedef:', hedefKelime);
 
-        // Kelime kontrolü
-        if (kelimeler.length > 0 && !kelimeler.includes(tahminString.toLowerCase())) {
+        // Kelime kontrolü (normalize edilmiş şekilde)
+        const normalizedTahmin = tahminString.toLocaleLowerCase('tr-TR');
+        if (kelimeler.length > 0 && !kelimeler.includes(normalizedTahmin)) {
+            console.log('❌ Kelime listede yok:', normalizedTahmin);
             mesajGoster('Listede böyle bir kelime yok');
             shakeRow(mevcutSatir);
             return;
@@ -338,7 +346,8 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (e.key === 'Backspace') {
                 harfSil();
             } else if (/^[a-zA-ZğĞıİöÖşŞüÜçÇ]$/.test(e.key)) {
-                harfEkle(e.key.toUpperCase());
+                // Türkçe karakterleri doğru şekilde büyük harfe çevir
+                harfEkle(e.key.toLocaleUpperCase('tr-TR'));
             }
         });
 
@@ -363,7 +372,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (key === 'BACKSPACE') {
                     harfSil();
                 } else if (key) {
-                    harfEkle(key);
+                    // Türkçe karakterleri doğru şekilde büyük harfe çevir
+                    harfEkle(key.toLocaleUpperCase('tr-TR'));
                 }
             });
         }

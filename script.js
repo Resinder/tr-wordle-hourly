@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const MAX_GUESSES = 6;
     const ANIMATION_DURATION = 300; 
     
-    // API ve Dosya Yolları
     const kelimelerGistURL = 'https://gist.githubusercontent.com/Resinder/b2897fd639006e34a1bf54252d730f7b/raw/b29034e404094142bfeb896e7e8e5aa50b6db46f/tdk-5-harfli-kelimeler.json';
     const gizliKelimeURL = 'gizli-kelime.json';
 
@@ -19,172 +18,154 @@ document.addEventListener('DOMContentLoaded', () => {
     const messageContainer = document.getElementById('message-container');
     const timerSpan = document.querySelector('#timer span');
 
+    // TÜM TÜRKÇE HARF SORUNLARINI ÇÖZEN FONKSİYON
+    function trNormalize(text, type = 'upper') {
+        if (type === 'upper') {
+            return text.replace(/i/g, 'İ').replace(/ı/g, 'I').toUpperCase().trim();
+        }
+        return text.replace(/İ/g, 'i').replace(/I/g, 'ı').toLowerCase().trim();
+    }
+
     async function init() {
         try {
             oyunTahtasiniOlustur();
-            
-            // Cache engellemek için timestamp ekliyoruz
             const cacheBuster = `?t=${Date.now()}`;
-            const gizliKelimeResponse = await fetch(gizliKelimeURL + cacheBuster);
-            if (!gizliKelimeResponse.ok) throw new Error("Kelime dosyası bulunamadı.");
+            const response = await fetch(gizliKelimeURL + cacheBuster);
+            const data = await response.json();
+            
+            // Hedef kelimeyi standardize et
+            hedefKelime = trNormalize(data.kelime, 'upper');
 
-            const gizliKelimeData = await gizliKelimeResponse.json();
-            // Hedef kelimeyi standart büyük harfe çevir
-            hedefKelime = gizliKelimeData.kelime.trim().toUpperCase();
-
-            const kelimelerResponse = await fetch(kelimelerGistURL);
-            if (kelimelerResponse.ok) {
-                const liste = await kelimelerResponse.json();
-                // Sözlüğü küçük harf ve standart hale getir
-                kelimeler = liste.map(k => k.trim().toLowerCase());
+            const kResp = await fetch(kelimelerGistURL);
+            if (kResp.ok) {
+                const list = await kResp.json();
+                // Sözlüğü standardize et
+                kelimeler = list.map(k => trNormalize(k, 'lower'));
             }
 
             klavyeOlayDinleyicileriEkle();
             geriSayimiBaslat();
             await loadGameState();
-        } catch (error) {
-            console.error("Başlatma Hatası:", error);
-        }
+        } catch (e) { console.error("Sistem yüklenemedi:", e); }
     }
 
     async function tahminiIsle(tahmin, isLoading) {
         const row = document.getElementById(`row-${mevcutSatir}`);
         const tiles = Array.from(row.children);
-        
-        const hedef = hedefKelime.toUpperCase();
-        const tahm = tahmin.toUpperCase();
+        const hedef = hedefKelime;
+        const tahm = trNormalize(tahmin, 'upper');
         
         const sonuc = new Array(WORD_LENGTH).fill('absent');
-        const harfHavuzu = {};
+        const havuz = {};
 
-        // Harf sayımlarını oluştur
-        [...hedef].forEach(h => harfHavuzu[h] = (harfHavuzu[h] || 0) + 1);
+        [...hedef].forEach(h => havuz[h] = (havuz[h] || 0) + 1);
 
-        // 1. Geçiş: Tam eşleşmeler (Yeşil)
+        // Yeşil kontrolü
         [...tahm].forEach((h, i) => {
             if (h === hedef[i]) {
                 sonuc[i] = 'correct';
-                harfHavuzu[h]--;
+                havuz[h]--;
             }
         });
 
-        // 2. Geçiş: Var olan harfler (Sarı)
+        // Sarı kontrolü
         [...tahm].forEach((h, i) => {
-            if (sonuc[i] !== 'correct' && harfHavuzu[h] > 0 && hedef.includes(h)) {
+            if (sonuc[i] !== 'correct' && havuz[h] > 0 && hedef.includes(h)) {
                 sonuc[i] = 'present';
-                harfHavuzu[h]--;
+                havuz[h]--;
             }
         });
 
-        // Görselleştirme
         for (let i = 0; i < WORD_LENGTH; i++) {
             const tile = tiles[i];
-            if (!isLoading) await new Promise(r => setTimeout(r, ANIMATION_DURATION));
-            
+            if (!isLoading) await new Promise(r => setTimeout(r, 100));
             tile.classList.add('flip');
             
-            // Animasyonun ortasında rengi değiştir
-            await new Promise(r => setTimeout(r, 250));
-            tile.classList.add(sonuc[i]);
-            klavyeGuncelle(tahm[i], sonuc[i]);
+            setTimeout(() => {
+                tile.className = `tile filled ${sonuc[i]}`;
+                klavyeGuncelle(tahm[i], sonuc[i]);
+            }, 250);
         }
-        if (!isLoading) await new Promise(r => setTimeout(r, 200));
     }
 
     async function tahminiGonder(isLoading = false) {
         if (oyunBitti || mevcutKaro !== WORD_LENGTH) return;
 
         const tahmin = Array.from({length: WORD_LENGTH}, (_, i) => 
-            document.getElementById(`tile-${mevcutSatir}-${i}`).textContent.trim()
-        ).join('').toUpperCase();
+            document.getElementById(`tile-${mevcutSatir}-${i}`).textContent
+        ).join('');
+
+        const normalizedTahminUpper = trNormalize(tahmin, 'upper');
+        const normalizedTahminLower = trNormalize(tahmin, 'lower');
 
         if (!isLoading) {
-            const normalizedTahmin = tahmin.toLowerCase();
-            const isSecretWord = (tahmin === hedefKelime);
-
-            // Eğer hedef kelime PRINT ise ve sözlükte yoksa bile kabul et
-            if (!isSecretWord && kelimeler.length > 0 && !kelimeler.includes(normalizedTahmin)) {
+            const isMatch = (normalizedTahminUpper === hedefKelime);
+            if (!isMatch && kelimeler.length > 0 && !kelimeler.includes(normalizedTahminLower)) {
                 mesajGoster('Sözlükte yok');
                 shakeRow(mevcutSatir);
                 return;
             }
-            guesses.push(tahmin);
+            guesses.push(normalizedTahminUpper);
             saveGameState();
         }
 
-        await tahminiIsle(tahmin, isLoading);
-        
-        if (tahmin === hedefKelime) {
+        await tahminiIsle(normalizedTahminUpper, isLoading);
+
+        if (normalizedTahminUpper === hedefKelime) {
             oyunBitti = true;
             if (!isLoading) celebrateWin();
             return;
         }
 
-        if (mevcutSatir + 1 >= MAX_GUESSES) {
+        if (mevcutSatir >= MAX_GUESSES - 1) {
             oyunBitti = true;
             if (!isLoading) mesajGoster(`Kelime: ${hedefKelime}`, 5000);
-            return;
+        } else {
+            mevcutSatir++;
+            mevcutKaro = 0;
         }
-
-        mevcutSatir++;
-        mevcutKaro = 0;
     }
 
-    function harfEkle(harf) {
+    function harfEkle(h) {
         if (oyunBitti || mevcutKaro >= WORD_LENGTH) return;
-        const karo = document.getElementById(`tile-${mevcutSatir}-${mevcutKaro}`);
-        if (karo) {
-            karo.textContent = harf.toUpperCase();
-            karo.classList.add('filled');
-            mevcutKaro++;
-        }
+        const tile = document.getElementById(`tile-${mevcutSatir}-${mevcutKaro}`);
+        tile.textContent = trNormalize(h, 'upper');
+        tile.classList.add('filled');
+        mevcutKaro++;
     }
 
     function harfSil() {
-        if (oyunBitti || mevcutKaro <= 0) return;
+        if (mevcutKaro <= 0) return;
         mevcutKaro--;
-        const karo = document.getElementById(`tile-${mevcutSatir}-${mevcutKaro}`);
-        karo.textContent = '';
-        karo.classList.remove('filled');
+        const tile = document.getElementById(`tile-${mevcutSatir}-${mevcutKaro}`);
+        tile.textContent = '';
+        tile.classList.remove('filled');
     }
 
-    function klavyeGuncelle(harf, durum) {
-        const key = document.querySelector(`[data-key="${harf}"]`);
+    function klavyeGuncelle(h, s) {
+        const key = document.querySelector(`[data-key="${h}"]`);
         if (!key) return;
-        if (durum === 'correct') {
-            key.className = 'key correct';
-        } else if (durum === 'present' && !key.classList.contains('correct')) {
-            key.className = 'key present';
-        } else if (durum === 'absent' && !key.classList.contains('correct') && !key.classList.contains('present')) {
-            key.className = 'key absent';
-        }
-    }
-
-    function saveGameState() {
-        const state = { 
-            target: hedefKelime, 
-            guesses: guesses, 
-            timestamp: Date.now(),
-            date: new Date().toDateString() 
-        };
-        localStorage.setItem('tr-wordle-state', JSON.stringify(state));
+        if (s === 'correct') key.className = 'key correct';
+        else if (s === 'present' && !key.classList.contains('correct')) key.className = 'key present';
+        else if (s === 'absent' && !key.classList.contains('correct') && !key.classList.contains('present')) key.className = 'key absent';
     }
 
     async function loadGameState() {
         const saved = localStorage.getItem('tr-wordle-state');
         if (!saved) return;
         const state = JSON.parse(saved);
-        
-        // Eğer gün değiştiyse veya yeni bir hedef kelime geldiyse temizle
         if (state.target !== hedefKelime) {
             localStorage.removeItem('tr-wordle-state');
             return;
         }
-
-        for (const guess of state.guesses) {
-            for (const char of guess) harfEkle(char);
+        for (const g of state.guesses) {
+            [...g].forEach(h => harfEkle(h));
             await tahminiGonder(true);
         }
+    }
+
+    function saveGameState() {
+        localStorage.setItem('tr-wordle-state', JSON.stringify({target: hedefKelime, guesses: guesses}));
     }
 
     function oyunTahtasiniOlustur() {
@@ -208,14 +189,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (oyunBitti) return;
             if (e.key === 'Enter') tahminiGonder();
             else if (e.key === 'Backspace') harfSil();
-            else if (/^[a-zA-ZçğİıöşüÇĞÖŞÜ]$/.test(e.key)) {
-                // I/i karmaşasını önlemek için klavye girişini temizle
-                let char = e.key.toUpperCase();
-                if (char === 'i') char = 'İ';
-                harfEkle(char);
-            }
+            else if (/^[a-zA-ZçğİıöşüÇĞÖŞÜ]$/.test(e.key)) harfEkle(e.key);
         });
-
         klavye.addEventListener('click', (e) => {
             const btn = e.target.closest('button');
             if (!btn || oyunBitti) return;
@@ -227,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function geriSayimiBaslat() {
-        const updateTimer = () => {
+        const tick = () => {
             const now = new Date();
             const next = new Date(now).setHours(now.getHours() + 1, 0, 0, 0);
             const diff = next - now;
@@ -235,8 +210,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const s = Math.floor((diff / 1000) % 60);
             timerSpan.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
         };
-        updateTimer();
-        setInterval(updateTimer, 1000);
+        tick();
+        setInterval(tick, 1000);
     }
 
     function mesajGoster(t, d = 2000) {
@@ -244,21 +219,14 @@ document.addEventListener('DOMContentLoaded', () => {
         m.className = 'message show';
         m.textContent = t;
         messageContainer.appendChild(m);
-        setTimeout(() => { m.classList.remove('show'); setTimeout(() => m.remove(), 300); }, d);
+        setTimeout(() => m.remove(), d);
     }
 
+    function celebrateWin() { mesajGoster('TEBRİKLER!', 5000); }
     function shakeRow(i) {
         const r = document.getElementById(`row-${i}`);
         r.classList.add('shake');
         setTimeout(() => r.classList.remove('shake'), 500);
-    }
-
-    function celebrateWin() {
-        const r = document.getElementById(`row-${mevcutSatir}`);
-        Array.from(r.children).forEach((t, i) => {
-            setTimeout(() => t.classList.add('bounce'), i * 100);
-        });
-        mesajGoster('TEBRİKLER!', 5000);
     }
 
     init();

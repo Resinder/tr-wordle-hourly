@@ -2,11 +2,9 @@ name: Hourly Word (Smart Update) & Deploy
 
 on:
   schedule:
-    # Her 5 dakikada bir kontrol eder
     - cron: '*/5 * * * *' 
   workflow_dispatch:
 
-# Aynı anda birden fazla işin çalışmasını engelleyerek çakışmaları önler
 concurrency:
   group: "word-update"
   cancel-in-progress: true
@@ -19,7 +17,6 @@ permissions:
 jobs:
   check-and-update:
     runs-on: ubuntu-latest
-    # Deployment adımlarının bu job içindeki değişkenlere erişebilmesi için output tanımlıyoruz
     outputs:
       HAS_CHANGES: ${{ steps.commit_step.outputs.changed }}
     
@@ -27,7 +24,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Git geçmişini tam çekerek push hatalarını önler
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -45,7 +43,6 @@ jobs:
             const FILE_NAME = 'gizli-kelime.json';
             
             const now = new Date();
-            // "YYYY-MM-DD-HH" formatında bir anahtar oluşturuyoruz (Örn: 2025-11-18-19)
             const currentHourKey = `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}-${now.getUTCHours()}`;
 
             try {
@@ -53,18 +50,14 @@ jobs:
               if (fs.existsSync(FILE_NAME)) {
                 try {
                   data = JSON.parse(fs.readFileSync(FILE_NAME, 'utf-8'));
-                } catch (e) { console.log("Dosya bozuk, sıfırlanıyor."); }
+                } catch (e) { console.log("Dosya bozuk, sifirlaniyor."); }
               }
 
-              // KONTROL: Eğer hourKey eşleşiyorsa bu saatte zaten işlem yapılmış demektir
               if (data.hourKey === currentHourKey) {
-                console.log(`>>> ${currentHourKey} saati için zaten güncel. İşlem yapılmıyor.`);
+                console.log(`Zaten guncel: ${currentHourKey}`);
                 process.exit(0);
               }
 
-              console.log(`>>> Yeni saat algılandı (${currentHourKey}). Veri çekiliyor...`);
-              
-              // Retry Mekanizması: Bağlantı hatası olursa 3 kez dener
               let response;
               for (let i = 0; i < 3; i++) {
                 try {
@@ -86,9 +79,9 @@ jobs:
                 hourKey: currentHourKey
               }, null, 2));
               
-              console.log(`>>> BAŞARILI: Yeni kelime "${yeniKelime}"`);
+              console.log(`Yeni kelime: ${yeniKelime}`);
             } catch (err) {
-              console.error(">>> KRİTİK HATA:", err.message);
+              console.error("Hata:", err.message);
               process.exit(1);
             }
           }
@@ -103,15 +96,15 @@ jobs:
           git add gizli-kelime.json
           
           if ! git diff --cached --quiet; then
-            git commit -m "🔄 Kelime Güncellendi: $(date -u +'%Y-%m-%d %H:00 UTC')"
+            git commit -m "🔄 Kelime Guncellendi: $(date -u +'%Y-%m-%d %H:00 UTC')"
+            # Cakismazlik icin once pull yapip sonra push ediyoruz
+            git pull --rebase origin main
             git push origin main
             echo "changed=true" >> $GITHUB_OUTPUT
           else
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
 
-      # --- SADECE KELİME DEĞİŞTİYSE ÇALIŞACAK DEPLOY ADIMLARI ---
-      
       - name: Deployment Setup
         if: steps.commit_step.outputs.changed == 'true'
         uses: actions/configure-pages@v4

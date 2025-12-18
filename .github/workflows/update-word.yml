@@ -83,5 +83,6 @@ jobs:
             echo "Değişiklik yok, commit yapılmıyor."
           else
             git commit -m "🔄 Kelime Güncellendi: $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git pull --rebase
             git push
           fi

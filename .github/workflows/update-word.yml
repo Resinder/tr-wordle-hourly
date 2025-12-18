@@ -14,8 +14,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          # persist-credentials true varsayılan olarak gelir, token otomatik yönetilir
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -38,18 +36,21 @@ jobs:
               try {
                 const kelimeler = JSON.parse(data);
                 
-                // Mevcut kelimeyi oku (aynısını seçmemek için)
                 let eskiKelime = "";
                 if (fs.existsSync(FILE_NAME)) {
-                  const currentFile = JSON.parse(fs.readFileSync(FILE_NAME, 'utf-8'));
-                  eskiKelime = currentFile.kelime;
+                  try {
+                    const currentFile = JSON.parse(fs.readFileSync(FILE_NAME, 'utf-8'));
+                    eskiKelime = currentFile.kelime;
+                  } catch (e) {
+                    console.log("Mevcut dosya okunamadı, yeni oluşturuluyor.");
+                  }
                 }
 
-                // Yeni kelime seç (Eskisinden farklı olana kadar)
                 let yeniKelime;
                 do {
                   const index = Math.floor(Math.random() * kelimeler.length);
-                  yeniKelime = kelimeler[index].toUpperCase('tr-TR');
+                  // Düzeltme: .toLocaleUpperCase('tr-TR') kullanılmalı
+                  yeniKelime = kelimeler[index].toLocaleUpperCase('tr-TR');
                 } while (yeniKelime === eskiKelime && kelimeler.length > 1);
 
                 const output = {
@@ -76,10 +77,11 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           
-          if [[ -n $(git status --porcelain) ]]; then
-            git add gizli-kelime.json
-            git commit -m "🔄 Kelime Güncellendi: $(date -u +'%H:%M UTC')"
-            git push
+          # Değişiklik kontrolü ve push
+          git add gizli-kelime.json
+          if git diff --cached --quiet; then
+            echo "Değişiklik yok, commit yapılmıyor."
           else
-            echo "Değişiklik yok."
+            git commit -m "🔄 Kelime Güncellendi: $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
           fi

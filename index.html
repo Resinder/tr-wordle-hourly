@@ -3,36 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Her saat başı yeni kelime ile Türkçe Wordle oyunu">
+    <meta name="keywords" content="wordle, türkçe wordle, kelime oyunu, puzzle">
     <title>Türkçe Wordle - Saatlik</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <header>
-        <h1>TÜRKÇE WORDLE</h1>
-        <p id="timer">Yeni kelimeye: <span></span></p>
-    </header>
+    <div class="container">
+        <header>
+            <h1>TÜRKÇE WORDLE</h1>
+            <div id="timer">Yeni kelimeye: <span>--:--</span></div>
+        </header>
 
-    <main>
+        <div id="message-container"></div>
+
         <div id="game-board"></div>
-    </main>
 
-    <section id="keyboard">
-        <div class="keyboard-row">
-            <button data-key="Q">Q</button><button data-key="W">W</button><button data-key="E">E</button><button data-key="R">R</button><button data-key="T">T</button><button data-key="Y">Y</button><button data-key="U">U</button><button data-key="I">I</button><button data-key="O">O</button><button data-key="P">P</button><button data-key="Ğ">Ğ</button><button data-key="Ü">Ü</button>
+        <div id="keyboard">
+            <div class="keyboard-row">
+                <button class="key" data-key="E">E</button>
+                <button class="key" data-key="R">R</button>
+                <button class="key" data-key="T">T</button>
+                <button class="key" data-key="Y">Y</button>
+                <button class="key" data-key="U">U</button>
+                <button class="key" data-key="I">I</button>
+                <button class="key" data-key="O">O</button>
+                <button class="key" data-key="P">P</button>
+                <button class="key" data-key="Ğ">Ğ</button>
+                <button class="key" data-key="Ü">Ü</button>
+            </div>
+            <div class="keyboard-row">
+                <button class="key" data-key="A">A</button>
+                <button class="key" data-key="S">S</button>
+                <button class="key" data-key="D">D</button>
+                <button class="key" data-key="F">F</button>
+                <button class="key" data-key="G">G</button>
+                <button class="key" data-key="H">H</button>
+                <button class="key" data-key="J">J</button>
+                <button class="key" data-key="K">K</button>
+                <button class="key" data-key="L">L</button>
+                <button class="key" data-key="Ş">Ş</button>
+                <button class="key" data-key="İ">İ</button>
+            </div>
+            <div class="keyboard-row">
+                <button class="key wide" data-key="ENTER">GİR</button>
+                <button class="key" data-key="Z">Z</button>
+                <button class="key" data-key="C">C</button>
+                <button class="key" data-key="V">V</button>
+                <button class="key" data-key="B">B</button>
+                <button class="key" data-key="N">N</button>
+                <button class="key" data-key="M">M</button>
+                <button class="key" data-key="Ö">Ö</button>
+                <button class="key" data-key="Ç">Ç</button>
+                <button class="key wide" data-key="BACKSPACE">⌫</button>
+            </div>
         </div>
-        <div class="keyboard-row">
-            <button data-key="A">A</button><button data-key="S">S</button><button data-key="D">D</button><button data-key="F">F</button><button data-key="G">G</button><button data-key="H">H</button><button data-key="J">J</button><button data-key="K">K</button><button data-key="L">L</button><button data-key="Ş">Ş</button><button data-key="İ">İ</button>
-        </div>
-        <div class="keyboard-row">
-            <button data-key="ENTER" class="wide-btn">ENTER</button><button data-key="Z">Z</button><button data-key="X">X</button><button data-key="C">C</button><button data-key="V">V</button><button data-key="B">B</button><button data-key="N">N</button><button data-key="M">M</button><button data-key="Ö">Ö</button><button data-key="Ç">Ç</button><button data-key="BACKSPACE" class="wide-btn"><svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path fill="currentColor" d="M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z"/></svg></button>
-        </div>
-    </section>
+    </div>
 
-    <div id="message-container"></div>
-    
     <script src="script.js"></script>
 </body>
 </html>

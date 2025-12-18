@@ -6,7 +6,10 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
     background: linear-gradient(135deg, #0a0a0b 0%, #1a1a2e 100%);
     color: #ffffff;
     display: flex;
@@ -124,6 +127,8 @@ h1 {
     transition: all 0.15s ease;
     position: relative;
     background: rgba(255, 255, 255, 0.02);
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+    letter-spacing: 0;
 }
 
 .tile::before {
@@ -200,6 +205,8 @@ h1 {
     transition: all 0.15s ease;
     box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2), 0 1px 0 rgba(255, 255, 255, 0.1) inset;
     position: relative;
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+    letter-spacing: 0.5px;
 }
 
 .key::after {

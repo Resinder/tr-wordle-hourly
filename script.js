@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const messageContainer = document.getElementById('message-container');
     const timerSpan = document.querySelector('#timer span');
 
-    // TÜM TÜRKÇE HARF SORUNLARINI ÇÖZEN FONKSİYON
+    // Harf Hatalarını Önleyen Normalizasyon
     function trNormalize(text, type = 'upper') {
         if (type === 'upper') {
             return text.replace(/i/g, 'İ').replace(/ı/g, 'I').toUpperCase().trim();
@@ -27,26 +27,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function init() {
+        oyunTahtasiniOlustur();
         try {
-            oyunTahtasiniOlustur();
             const cacheBuster = `?t=${Date.now()}`;
             const response = await fetch(gizliKelimeURL + cacheBuster);
             const data = await response.json();
             
-            // Hedef kelimeyi standardize et
             hedefKelime = trNormalize(data.kelime, 'upper');
+            // JSON içindeki "saat" bilgisinden saat değerini alıyoruz (Örn: 13)
+            const sunucuSaati = new Date(data.saat).getHours();
 
             const kResp = await fetch(kelimelerGistURL);
             if (kResp.ok) {
                 const list = await kResp.json();
-                // Sözlüğü standardize et
                 kelimeler = list.map(k => trNormalize(k, 'lower'));
             }
 
             klavyeOlayDinleyicileriEkle();
             geriSayimiBaslat();
-            await loadGameState();
-        } catch (e) { console.error("Sistem yüklenemedi:", e); }
+            // Saat farkını kontrol ederek tahminleri yükle
+            await loadGameState(sunucuSaati);
+        } catch (e) { console.error("Başlatma hatası:", e); }
     }
 
     async function tahminiIsle(tahmin, isLoading) {
@@ -57,10 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const sonuc = new Array(WORD_LENGTH).fill('absent');
         const havuz = {};
-
         [...hedef].forEach(h => havuz[h] = (havuz[h] || 0) + 1);
 
-        // Yeşil kontrolü
         [...tahm].forEach((h, i) => {
             if (h === hedef[i]) {
                 sonuc[i] = 'correct';
@@ -68,7 +67,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Sarı kontrolü
         [...tahm].forEach((h, i) => {
             if (sonuc[i] !== 'correct' && havuz[h] > 0 && hedef.includes(h)) {
                 sonuc[i] = 'present';
@@ -80,7 +78,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const tile = tiles[i];
             if (!isLoading) await new Promise(r => setTimeout(r, 100));
             tile.classList.add('flip');
-            
             setTimeout(() => {
                 tile.className = `tile filled ${sonuc[i]}`;
                 klavyeGuncelle(tahm[i], sonuc[i]);
@@ -96,10 +93,11 @@ document.addEventListener('DOMContentLoaded', () => {
         ).join('');
 
         const normalizedTahminUpper = trNormalize(tahmin, 'upper');
-        const normalizedTahminLower = trNormalize(tahmin, 'lower');
 
         if (!isLoading) {
+            const normalizedTahminLower = trNormalize(tahmin, 'lower');
             const isMatch = (normalizedTahminUpper === hedefKelime);
+            
             if (!isMatch && kelimeler.length > 0 && !kelimeler.includes(normalizedTahminLower)) {
                 mesajGoster('Sözlükte yok');
                 shakeRow(mevcutSatir);
@@ -150,22 +148,33 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (s === 'absent' && !key.classList.contains('correct') && !key.classList.contains('present')) key.className = 'key absent';
     }
 
-    async function loadGameState() {
+    function saveGameState() {
+        const now = new Date();
+        const state = {
+            target: hedefKelime,
+            guesses: guesses,
+            saat: now.getHours(),
+            tarih: now.toDateString()
+        };
+        localStorage.setItem('tr-wordle-state', JSON.stringify(state));
+    }
+
+    async function loadGameState(sunucuSaati) {
         const saved = localStorage.getItem('tr-wordle-state');
         if (!saved) return;
         const state = JSON.parse(saved);
-        if (state.target !== hedefKelime) {
+        const now = new Date();
+
+        // SAAT KONTROLÜ: Farklı saat veya farklı kelimeyse sil
+        if (state.saat !== sunucuSaati || state.tarih !== now.toDateString() || state.target !== hedefKelime) {
             localStorage.removeItem('tr-wordle-state');
             return;
         }
+
         for (const g of state.guesses) {
             [...g].forEach(h => harfEkle(h));
             await tahminiGonder(true);
         }
-    }
-
-    function saveGameState() {
-        localStorage.setItem('tr-wordle-state', JSON.stringify({target: hedefKelime, guesses: guesses}));
     }
 
     function oyunTahtasiniOlustur() {

@@ -26,8 +26,8 @@ jobs:
       # 2. Git kullanıcısını ayarla
       - name: Setup Git
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
       
       # 3. Node.js ortamını kurar
       - name: Setup Node.js
@@ -36,38 +36,117 @@ jobs:
           node-version: '20'
       
       # 4. Kelimeyi seçen script'i çalıştırır
-      - name: Select new word
+      - name: Download word list and select word
         run: |
-          echo "Kelime listesi indiriliyor..."
-          curl -o kelimeler.json "https://gist.githubusercontent.com/Resinder/b2897fd639006e34a1bf54252d730f7b/raw/b29034e404094142bfeb896e7e8e5aa50b6db46f/tdk-5-harfli-kelimeler.json"
+          echo "📥 Kelime listesi indiriliyor..."
+          curl -s -o kelimeler.json "https://gist.githubusercontent.com/Resinder/b2897fd639006e34a1bf54252d730f7b/raw/b29034e404094142bfeb896e7e8e5aa50b6db46f/tdk-5-harfli-kelimeler.json"
           
-          echo "Rastgele kelime seçiliyor..."
-          node -e "
-            const fs = require('fs');
-            const kelimeler = JSON.parse(fs.readFileSync('kelimeler.json', 'utf-8'));
+          echo "📊 İndirilen dosya boyutu:"
+          ls -lh kelimeler.json
+          
+          echo "🔍 İlk 3 kelime:"
+          head -n 3 kelimeler.json
+          
+          echo "🎲 Rastgele kelime seçiliyor..."
+          node << 'EOF'
+          const fs = require('fs');
+          
+          try {
+            // Kelime listesini oku
+            const kelimelerText = fs.readFileSync('kelimeler.json', 'utf-8');
+            const kelimeler = JSON.parse(kelimelerText);
+            
+            console.log(`📚 Toplam ${kelimeler.length} kelime bulundu`);
+            
+            // Rastgele kelime seç
             const rastgeleIndeks = Math.floor(Math.random() * kelimeler.length);
             const secilenKelime = kelimeler[rastgeleIndeks];
+            
+            // 5 harfli olduğundan emin ol
+            if (secilenKelime.length !== 5) {
+              console.error(`❌ Hata: Seçilen kelime 5 harfli değil: ${secilenKelime}`);
+              process.exit(1);
+            }
+            
+            // JSON dosyası oluştur
             const jsonVerisi = { 
-              kelime: secilenKelime, 
-              saat: new Date().toISOString() 
+              kelime: secilenKelime.toUpperCase(),
+              saat: new Date().toISOString(),
+              timestamp: Date.now()
             };
-            fs.writeFileSync('gizli-kelime.json', JSON.stringify(jsonVerisi, null, 2));
-            console.log('✅ Yeni kelime seçildi:', secilenKelime);
-          "
+            
+            fs.writeFileSync('gizli-kelime.json', JSON.stringify(jsonVerisi, null, 2) + '\n');
+            
+            console.log('✅ Yeni kelime seçildi:', secilenKelime.toUpperCase());
+            console.log('📄 Dosya içeriği:');
+            console.log(fs.readFileSync('gizli-kelime.json', 'utf-8'));
+            
+          } catch (error) {
+            console.error('❌ Hata:', error.message);
+            process.exit(1);
+          }
+          EOF
           
-          # Geçici dosyayı temizle
-          rm kelimeler.json
+          echo "🧹 Geçici dosyayı temizle..."
+          rm -f kelimeler.json
+          
+          echo "✅ Kelime seçimi tamamlandı!"
       
-      # 5. Değişiklikleri commit ve push et
+      # 5. Dosyanın oluşturulduğunu doğrula
+      - name: Verify file creation
+        run: |
+          if [ ! -f gizli-kelime.json ]; then
+            echo "❌ Hata: gizli-kelime.json dosyası oluşturulmadı!"
+            exit 1
+          fi
+          
+          echo "✅ Dosya mevcut"
+          echo "📄 Dosya boyutu:"
+          ls -lh gizli-kelime.json
+          
+          echo "📝 Dosya içeriği:"
+          cat gizli-kelime.json
+          
+          echo "🔍 JSON geçerliliği kontrolü:"
+          node -e "console.log(JSON.parse(require('fs').readFileSync('gizli-kelime.json', 'utf-8')))"
+      
+      # 6. Git durumunu kontrol et
+      - name: Check git status
+        run: |
+          echo "📊 Git durumu:"
+          git status
+          
+          echo ""
+          echo "📝 Değişiklikler:"
+          git diff
+      
+      # 7. Değişiklikleri commit ve push et
       - name: Commit and push changes
         run: |
           # Değişiklik olup olmadığını kontrol et
           if [[ -n $(git status --porcelain) ]]; then
             echo "📝 Değişiklikler commit ediliyor..."
+            
             git add gizli-kelime.json
-            git commit -m "🔄 Saatlik kelime güncellendi - $(date +'%Y-%m-%d %H:%M UTC')"
+            git commit -m "🔄 Saatlik kelime güncellendi - $(date -u +'%Y-%m-%d %H:%M UTC')"
+            
+            echo "⬆️ Push yapılıyor..."
             git push
+            
             echo "✅ Başarıyla push edildi!"
           else
             echo "ℹ️ Değişiklik yok, push atlanıyor."
           fi
+      
+      # 8. Son kontrolü yap
+      - name: Final verification
+        if: success()
+        run: |
+          echo "🎉 Workflow başarıyla tamamlandı!"
+          echo ""
+          echo "📊 Özet:"
+          echo "  - Dosya: gizli-kelime.json"
+          echo "  - Boyut: $(stat -f%z gizli-kelime.json 2>/dev/null || stat -c%s gizli-kelime.json) bytes"
+          echo "  - Zaman: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          echo ""
+          echo "✅ Kelime başarıyla güncellendi ve push edildi!"

@@ -20,8 +20,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Başlangıç Fonksiyonları ---
     async function init() {
         try {
-            // Önce gizli kelimeyi yükle
-            const gizliKelimeResponse = await fetch(gizliKelimeURL);
+            // Önce gizli kelimeyi yükle (cache bypass için timestamp ekle)
+            const cacheBuster = `?t=${Date.now()}`;
+            const gizliKelimeResponse = await fetch(gizliKelimeURL + cacheBuster);
             
             if (!gizliKelimeResponse.ok) {
                 throw new Error("Gizli kelime dosyası bulunamadı. GitHub Actions henüz çalışmamış olabilir.");

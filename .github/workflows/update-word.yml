@@ -1,17 +1,18 @@
-name: Update Hourly Word
+name: Update Hourly Word & Deploy
 
 on:
   schedule:
-    - cron: '0 * * * *' # Her saat başı
-  workflow_dispatch: # Manuel tetikleme
+    # Tam saat başında değil, 5 geçe çalıştırıyoruz (Yoğunluktan kaçınmak için)
+    - cron: '5 * * * *' 
+  workflow_dispatch:
 
 permissions:
   contents: write
-  pages: write      # Pages'e yazma izni
-  id-token: write   # Deployment için kimlik doğrulama
+  pages: write
+  id-token: write
 
 jobs:
-  update-word:
+  update-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -23,68 +24,72 @@ jobs:
           node-version: '20'
 
       - name: Select New Word
+        # 'fetch' kullanarak daha modern ve hata yakalaması kolay bir yapıya geçtik
         run: |
           node << 'EOF'
           const fs = require('fs');
-          const https = require('https');
+          
+          async function updateWord() {
+            const GIST_URL = "https://gist.githubusercontent.com/Resinder/b2897fd639006e34a1bf54252d730f7b/raw/b29034e404094142bfeb896e7e8e5aa50b6db46f/tdk-5-harfli-kelimeler.json";
+            const FILE_NAME = 'gizli-kelime.json';
 
-          const GIST_URL = "https://gist.githubusercontent.com/Resinder/b2897fd639006e34a1bf54252d730f7b/raw/b29034e404094142bfeb896e7e8e5aa50b6db46f/tdk-5-harfli-kelimeler.json";
-          const FILE_NAME = 'gizli-kelime.json';
+            try {
+              const response = await fetch(GIST_URL);
+              if (!response.ok) throw new Error(`HTTP Hata: ${response.status}`);
+              const kelimeler = await response.json();
 
-          https.get(GIST_URL, (res) => {
-            let data = '';
-            res.on('data', (chunk) => data += chunk);
-            res.on('end', () => {
-              try {
-                const kelimeler = JSON.parse(data);
-                
-                let eskiKelime = "";
-                if (fs.existsSync(FILE_NAME)) {
-                  try {
-                    const currentFile = JSON.parse(fs.readFileSync(FILE_NAME, 'utf-8'));
-                    eskiKelime = currentFile.kelime;
-                  } catch (e) {
-                    console.log("Mevcut dosya okunamadı, yeni oluşturuluyor.");
-                  }
-                }
-
-                let yeniKelime;
-                do {
-                  const index = Math.floor(Math.random() * kelimeler.length);
-                  // Düzeltme: .toLocaleUpperCase('tr-TR') kullanılmalı
-                  yeniKelime = kelimeler[index].toLocaleUpperCase('tr-TR');
-                } while (yeniKelime === eskiKelime && kelimeler.length > 1);
-
-                const output = {
-                  kelime: yeniKelime,
-                  saat: new Date().toISOString(),
-                  timestamp: Date.now()
-                };
-
-                fs.writeFileSync(FILE_NAME, JSON.stringify(output, null, 2));
-                console.log(`✅ Eski: ${eskiKelime} -> Yeni: ${yeniKelime}`);
-              } catch (e) {
-                console.error("Hata:", e.message);
-                process.exit(1);
+              let eskiKelime = "";
+              if (fs.existsSync(FILE_NAME)) {
+                try {
+                  eskiKelime = JSON.parse(fs.readFileSync(FILE_NAME, 'utf-8')).kelime;
+                } catch (e) { console.log("Eski dosya okunamadı."); }
               }
-            });
-          }).on('error', (err) => {
-            console.error("İndirme Hatası:", err.message);
-            process.exit(1);
-          });
+
+              let yeniKelime;
+              do {
+                yeniKelime = kelimeler[Math.floor(Math.random() * kelimeler.length)].toLocaleUpperCase('tr-TR');
+              } while (yeniKelime === eskiKelime && kelimeler.length > 1);
+
+              const data = {
+                kelime: yeniKelime,
+                saat: new Date().toISOString(),
+                timestamp: Date.now()
+              };
+
+              fs.writeFileSync(FILE_NAME, JSON.stringify(data, null, 2));
+              console.log(`✅ Güncellendi: ${yeniKelime}`);
+            } catch (error) {
+              console.error("Kritik Hata:", error.message);
+              process.exit(1);
+            }
+          }
+
+          updateWord();
           EOF
 
       - name: Commit and push changes
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Değişiklik kontrolü ve push
           git add gizli-kelime.json
-          if git diff --cached --quiet; then
-            echo "Değişiklik yok, commit yapılmıyor."
-          else
-            git commit -m "🔄 Kelime Güncellendi: $(date -u +'%Y-%m-%d %H:%M UTC')"
-            git pull --rebase
+          if ! git diff --cached --quiet; then
+            git commit -m "🔄 Otomatik Güncelleme: $(date -u +'%Y-%m-%d %H:%M UTC')"
             git push
+          else
+            echo "Değişiklik yok."
           fi
+
+      # ALDIĞIN TIMEOUT HATASINI ÇÖZEN OTOMATİK DEPLOYMENT KISMI
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.' # Tüm kök dizini yükle
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
+        with:
+          # Bağlantı hatalarına karşı otomatik yeniden deneme (timeout koruması)
+          timeout: 60000

@@ -18,6 +18,7 @@ h1 { font-weight: 900; letter-spacing: -1px; }
 .highlight { background: linear-gradient(90deg, #58a6ff, #bc8cff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 #timer { font-size: 0.8rem; color: #8b949e; margin-top: 4px; }
 
+/* Oyun Tahtası */
 #game-board { display: flex; flex-direction: column; gap: 6px; flex-grow: 1; justify-content: center; align-items: center; }
 .row { display: flex; gap: 6px; }
 .tile {
@@ -25,13 +26,16 @@ h1 { font-weight: 900; letter-spacing: -1px; }
     border: 2px solid var(--border); border-radius: 8px;
     display: flex; align-items: center; justify-content: center;
     font-size: 1.8rem; font-weight: 800; background: rgba(255,255,255,0.02);
+    transition: background-color 0.5s, border-color 0.5s; /* Renk geçişi yumuşatıldı */
 }
 .tile.filled { border-color: #8b949e; transform: scale(1.05); }
-.tile.correct { background: var(--correct); border-color: var(--correct); }
-.tile.present { background: var(--present); border-color: var(--present); }
-.tile.absent { background: var(--absent); border-color: var(--absent); opacity: 0.5; }
 
-/* Klavye Düzeltmesi */
+/* Renk Durumları (Hem Karo Hem Klavye İçin) */
+.correct { background-color: var(--correct) !important; border-color: var(--correct) !important; color: white; }
+.present { background-color: var(--present) !important; border-color: var(--present) !important; color: white; }
+.absent { background-color: var(--absent) !important; border-color: var(--absent) !important; color: #8b949e; opacity: 0.6; }
+
+/* Klavye Tasarımı */
 #keyboard { margin-top: auto; padding-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
 .keyboard-row { display: flex; justify-content: center; gap: 4px; width: 100%; }
 .key {
@@ -39,10 +43,21 @@ h1 { font-weight: 900; letter-spacing: -1px; }
     background: var(--panel); color: white; border: none; border-radius: 6px;
     font-weight: 700; font-size: clamp(10px, 3vw, 14px);
     cursor: pointer; display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 3px 0 rgba(0,0,0,0.3); transition: 0.1s;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.3); 
+    transition: background-color 0.3s, transform 0.1s;
 }
 .key.wide { flex: 1.6; font-size: 11px; }
 .key:active { transform: translateY(2px); box-shadow: none; }
+
+/* Animasyonlar */
+@keyframes flip { 50% { transform: rotateX(90deg); } }
+.tile.flip { animation: flip 0.5s ease; }
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-5px); }
+    40%, 80% { transform: translateX(5px); }
+}
 
 /* Overlay & Mesaj */
 #wait-overlay {
@@ -53,8 +68,7 @@ h1 { font-weight: 900; letter-spacing: -1px; }
 .loader-bar { width: 180px; height: 4px; background: #30363d; margin-top: 20px; border-radius: 10px; overflow: hidden; }
 .loader-progress { width: 40%; height: 100%; background: var(--accent); animation: load 1.5s infinite; }
 @keyframes load { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
-@keyframes flip { 50% { transform: rotateX(90deg); } }
-.tile.flip { animation: flip 0.5s ease; }
+
 #message-container { position: fixed; top: 12%; left: 50%; transform: translateX(-50%); z-index: 3000; }
 .message { background: white; color: black; padding: 10px 20px; border-radius: 100px; font-weight: 800; display: flex; align-items: center; gap: 8px; box-shadow: 0 10px 20px rgba(0,0,0,0.4); }
 .message.nyan { background: #ff00ff; color: white; }

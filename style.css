@@ -1,9 +1,8 @@
-/* --- Profesyonel ve Kompakt Wordle Tasarımı --- */
+/* --- Kompakt ve Kenetlenmiş Wordle Tasarımı --- */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    -webkit-tap-highlight-color: transparent;
 }
 
 :root {
@@ -24,126 +23,96 @@ body {
     height: 100dvh;
     display: flex;
     flex-direction: column;
+    align-items: center; /* Yatayda ortala */
     overflow: hidden;
 }
 
 .container {
     width: 100%;
-    max-width: 400px; /* Biraz daha daraltarak kompakt hale getirdik */
-    margin: 0 auto;
+    max-width: 400px;
     height: 100%;
     display: flex;
     flex-direction: column;
     padding: 10px;
 }
 
-/* --- Header --- */
 header {
     padding: 10px 0;
     text-align: center;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    flex-shrink: 0; /* Header'ın daralmasını engelle */
 }
 
-h1 {
-    font-size: 24px;
-    font-weight: 900;
-    letter-spacing: -1px;
-}
-
-#timer {
-    font-size: 11px;
-    color: #94a3b8;
-}
-
-/* --- Oyun Tahtası (Düzeltilen Kısım) --- */
+/* --- TAHTA DÜZELTMESİ --- */
 #game-board {
-    display: flex; /* Grid yerine Flex içinde Row mantığı */
+    display: flex;
     flex-direction: column;
-    gap: 6px; /* Kutular arasındaki dikey boşluk */
+    gap: 6px; /* Satırlar arası mesafe */
     padding: 20px 0;
     align-items: center;
-    justify-content: center; /* Merkeze toplar, yaymaz */
-    flex-grow: 1; 
+    justify-content: center; /* Kutuları merkeze topla */
+    flex-grow: 1; /* Boşluğu kullan ama satırları yayma */
 }
 
 .row {
-    display: flex; /* Yan yana kutular */
-    gap: 6px; /* Kutular arasındaki yatay boşluk */
+    display: flex;
+    gap: 6px; /* Kutular arası yan yana mesafe */
+    justify-content: center;
 }
 
 .tile {
-    /* Kutular ekranın %14'ünü geçemez, max 58px olur */
-    width: clamp(45px, 14vw, 58px); 
-    height: clamp(45px, 14vw, 58px);
+    /* Sabit ve ekranla orantılı kare kutular */
+    width: 58px;
+    height: 58px;
+    /* Küçük ekranlar için küçülme ayarı */
+    max-width: 13vw;
+    max-height: 13vw;
+    
     border: 2px solid var(--tile-border);
-    border-radius: 2px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: clamp(1.5rem, 6vw, 2rem);
+    font-size: 2rem;
     font-weight: 800;
+    text-transform: uppercase;
     background: rgba(255, 255, 255, 0.03);
-    transition: transform 0.1s ease;
 }
 
-/* --- Durumlar --- */
-.tile.filled { border-color: #64748b; transform: scale(1.05); }
-.tile.correct { background: var(--correct) !important; border-color: var(--correct) !important; color: white; }
-.tile.present { background: var(--present) !important; border-color: var(--present) !important; color: white; }
-.tile.absent { background: var(--absent) !important; border-color: var(--absent) !important; opacity: 0.5; }
-
-/* --- Klavye --- */
+/* --- KLAVYE DÜZELTMESİ --- */
 #keyboard {
-    padding-bottom: 15px;
-    width: 100%;
+    margin-top: auto; /* Klavyeyi en alta yasla */
+    padding-bottom: 20px;
+    flex-shrink: 0;
 }
 
 .keyboard-row {
     display: flex;
     justify-content: center;
-    gap: 5px;
+    gap: 4px;
     margin-bottom: 8px;
-    width: 100%;
 }
 
 .key {
-    height: 54px;
+    height: 56px;
+    min-width: 30px;
     background: #334155;
     color: white;
     border: none;
     border-radius: 4px;
     font-weight: 700;
-    font-size: clamp(12px, 3vw, 14px);
+    font-size: 13px;
     flex: 1;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 3px 0px #1e293b;
 }
 
 .key.wide { flex: 1.5; }
-.key.active { transform: translateY(2px); box-shadow: none; }
 
-/* --- Mesajlar --- */
-#message-container {
-    position: fixed;
-    top: 15%;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1000;
-}
-
-.message {
-    background: white;
-    color: black;
-    padding: 10px 20px;
-    border-radius: 4px;
-    font-weight: 800;
-    margin-bottom: 5px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-}
-
-/* Animasyonlar */
+/* Renkler ve Animasyonlar aynı kalabilir */
+.tile.correct { background: var(--correct) !important; border-color: var(--correct) !important; }
+.tile.present { background: var(--present) !important; border-color: var(--present) !important; }
+.tile.absent { background: var(--absent) !important; border-color: var(--absent) !important; opacity: 0.5; }
+.tile.flip { animation: flip 0.5s ease-in-out; }
 @keyframes flip { 50% { transform: rotateX(90deg); } }
-.tile.flip { animation: flip 0.5s ease; }

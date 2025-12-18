@@ -1,118 +1,60 @@
 :root {
-    --bg: #0b0e14;
-    --panel: #161b22;
-    --text: #f0f6fc;
-    --correct: #2ea043;
-    --present: #d29922;
-    --absent: #30363d;
-    --border: #424b5b;
-    --accent: #58a6ff;
-    --tile-filled: #8b949e;
+    --bg: #0b0e14; --panel: #1d232c; --text: #f0f6fc;
+    --correct: #2ea043; --present: #d29922; --absent: #30363d;
+    --border: #424b5b; --accent: #58a6ff;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 body {
-    font-family: 'Inter', sans-serif;
-    background: var(--bg);
-    background-image: radial-gradient(circle at top right, #1d2b41 0%, transparent 40%);
-    color: var(--text);
-    height: 100dvh;
-    display: flex;
-    justify-content: center;
-    overflow: hidden;
+    font-family: 'Inter', sans-serif; background: var(--bg);
+    color: var(--text); height: 100dvh; display: flex; justify-content: center; overflow: hidden;
 }
 
-.container {
-    width: 100%;
-    max-width: 450px;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    padding: 15px;
-}
+.container { width: 100%; max-width: 480px; height: 100%; display: flex; flex-direction: column; padding: 10px; }
 
-header {
-    text-align: center;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 10px;
-}
-
-h1 { font-weight: 900; letter-spacing: -1px; font-size: 1.5rem; }
+header { text-align: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+h1 { font-weight: 900; letter-spacing: -1px; }
 .highlight { background: linear-gradient(90deg, #58a6ff, #bc8cff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+#timer { font-size: 0.8rem; color: #8b949e; margin-top: 4px; }
 
-#timer { font-size: 0.85rem; color: #8b949e; margin-top: 5px; }
-
-#game-board {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    flex-grow: 1;
-    justify-content: center;
-    align-items: center;
-}
-
+#game-board { display: flex; flex-direction: column; gap: 6px; flex-grow: 1; justify-content: center; align-items: center; }
 .row { display: flex; gap: 6px; }
-
 .tile {
-    width: clamp(50px, 14vw, 62px);
-    height: clamp(50px, 14vw, 62px);
-    border: 2px solid var(--border);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2rem;
-    font-weight: 800;
-    background: rgba(255, 255, 255, 0.02);
-    transition: all 0.1s ease;
+    width: clamp(45px, 13vw, 60px); height: clamp(45px, 13vw, 60px);
+    border: 2px solid var(--border); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.8rem; font-weight: 800; background: rgba(255,255,255,0.02);
 }
+.tile.filled { border-color: #8b949e; transform: scale(1.05); }
+.tile.correct { background: var(--correct); border-color: var(--correct); }
+.tile.present { background: var(--present); border-color: var(--present); }
+.tile.absent { background: var(--absent); border-color: var(--absent); opacity: 0.5; }
 
-.tile.filled { border-color: var(--tile-filled); transform: scale(1.05); }
-
-.tile.correct { background: var(--correct) !important; border-color: var(--correct) !important; }
-.tile.present { background: var(--present) !important; border-color: var(--present) !important; }
-.tile.absent { background: var(--absent) !important; border-color: var(--absent) !important; opacity: 0.5; }
-
-/* Klavye */
+/* Klavye Düzeltmesi */
+#keyboard { margin-top: auto; padding-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+.keyboard-row { display: flex; justify-content: center; gap: 4px; width: 100%; }
 .key {
-    height: 58px;
-    background: var(--panel);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-weight: 700;
-    font-size: 14px;
-    flex: 1;
-    cursor: pointer;
-    box-shadow: 0 3px 0 rgba(0,0,0,0.3);
-    transition: transform 0.1s;
+    height: 56px; flex: 1; min-width: 20px;
+    background: var(--panel); color: white; border: none; border-radius: 6px;
+    font-weight: 700; font-size: clamp(10px, 3vw, 14px);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.3); transition: 0.1s;
 }
-
+.key.wide { flex: 1.6; font-size: 11px; }
 .key:active { transform: translateY(2px); box-shadow: none; }
-.key.wide { flex: 1.5; }
 
-/* Nyan & Mesajlar */
-#message-container { position: fixed; top: 15%; left: 50%; transform: translateX(-50%); z-index: 1000; }
-.message {
-    background: white; color: black; padding: 12px 24px; border-radius: 100px;
-    font-weight: 800; display: flex; align-items: center; gap: 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-}
-.message.nyan { background: #ff00ff; color: white; border: 2px solid white; }
-
-/* Wait Overlay */
+/* Overlay & Mesaj */
 #wait-overlay {
-    position: fixed; inset: 0; background: rgba(11, 14, 20, 0.98);
-    display: none; justify-content: center; align-items: center; z-index: 2000;
+    position: fixed; inset: 0; background: rgba(11,14,20,0.98);
+    display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 2000;
 }
-#wait-overlay.active { display: flex; animation: fadeIn 0.5s forwards; }
-
-.loader-bar { width: 200px; height: 4px; background: #30363d; margin: 20px auto; border-radius: 10px; overflow: hidden; }
-.loader-progress { width: 50%; height: 100%; background: var(--accent); animation: loading 1.5s infinite ease-in-out; }
-
-@keyframes loading { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
+#wait-overlay.active { display: flex; }
+.loader-bar { width: 180px; height: 4px; background: #30363d; margin-top: 20px; border-radius: 10px; overflow: hidden; }
+.loader-progress { width: 40%; height: 100%; background: var(--accent); animation: load 1.5s infinite; }
+@keyframes load { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
 @keyframes flip { 50% { transform: rotateX(90deg); } }
 .tile.flip { animation: flip 0.5s ease; }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+#message-container { position: fixed; top: 12%; left: 50%; transform: translateX(-50%); z-index: 3000; }
+.message { background: white; color: black; padding: 10px 20px; border-radius: 100px; font-weight: 800; display: flex; align-items: center; gap: 8px; box-shadow: 0 10px 20px rgba(0,0,0,0.4); }
+.message.nyan { background: #ff00ff; color: white; }

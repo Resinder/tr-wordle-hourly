@@ -220,30 +220,27 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        // Tahmini işle
+        // Tahmini işle ve animasyonların bitmesini bekle
         await tahminiIsle(tahminString);
         
         // Kazanma kontrolü
         if (tahminString === hedefKelime) {
             oyunBitti = true;
-            setTimeout(() => {
-                mesajGoster('🎉 Tebrikler! Kelimeyi buldunuz!', 5000);
-                celebrateWin();
-            }, WORD_LENGTH * ANIMATION_DURATION + 500);
+            mesajGoster('🎉 Tebrikler! Kelimeyi buldunuz!', 5000);
+            celebrateWin();
             return;
         }
 
-        // Bir sonraki satıra geç
+        // Kaybetme kontrolü ÖNCE
+        if (mevcutSatir + 1 >= MAX_GUESSES) {
+            oyunBitti = true;
+            mesajGoster(`😔 Oyun Bitti! Kelime: ${hedefKelime}`, 5000);
+            return;
+        }
+
+        // Bir sonraki satıra geç (sadece oyun devam ediyorsa)
         mevcutSatir++;
         mevcutKaro = 0;
-
-        // Kaybetme kontrolü
-        if (mevcutSatir >= MAX_GUESSES) {
-            oyunBitti = true;
-            setTimeout(() => {
-                mesajGoster(`😔 Oyun Bitti! Kelime: ${hedefKelime}`, 5000);
-            }, WORD_LENGTH * ANIMATION_DURATION + 500);
-        }
     }
     
     function shakeRow(rowIndex) {

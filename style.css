@@ -1,27 +1,27 @@
-/* --- Modern Wordle Pro Tasarımı --- */
+/* --- Profesyonel ve Kompakt Wordle Tasarımı --- */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    -webkit-tap-highlight-color: transparent; /* Mobil tıklama efektini kaldır */
+    -webkit-tap-highlight-color: transparent;
 }
 
 :root {
-    --bg-dark: #0f172a; /* Slate 900 */
-    --bg-light: #1e293b; /* Slate 800 */
-    --correct: #10b981; /* Emerald 500 */
-    --present: #f59e0b; /* Amber 500 */
-    --absent: #475569; /* Slate 500 */
+    --bg-dark: #0f172a;
+    --bg-light: #1e293b;
+    --correct: #10b981;
+    --present: #f59e0b;
+    --absent: #475569;
     --tile-border: #334155;
     --text-main: #f8fafc;
 }
 
 body {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', sans-serif;
     background: radial-gradient(circle at top, var(--bg-light), var(--bg-dark));
     color: var(--text-main);
     height: 100vh;
-    height: 100dvh; /* Dynamic Viewport Height (Mobil için en iyisi) */
+    height: 100dvh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -29,171 +29,121 @@ body {
 
 .container {
     width: 100%;
-    max-width: 450px;
+    max-width: 400px; /* Biraz daha daraltarak kompakt hale getirdik */
     margin: 0 auto;
     height: 100%;
     display: flex;
     flex-direction: column;
-    padding: 10px 15px;
+    padding: 10px;
 }
 
-/* --- Header & Timer --- */
+/* --- Header --- */
 header {
-    padding: 15px 0;
+    padding: 10px 0;
     text-align: center;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 h1 {
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 900;
     letter-spacing: -1px;
-    text-transform: uppercase;
-    background: linear-gradient(to right, #fff, #94a3b8);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
 }
 
 #timer {
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    font-size: 11px;
     color: #94a3b8;
-    margin-top: 4px;
 }
 
-#timer span {
-    color: var(--correct);
-    font-variant-numeric: tabular-nums; /* Rakamların kaymasını engeller */
-}
-
-/* --- Oyun Tahtası (Board) --- */
+/* --- Oyun Tahtası (Düzeltilen Kısım) --- */
 #game-board {
-    flex-grow: 1;
-    display: grid;
-    grid-template-rows: repeat(6, 1fr);
-    gap: 8px;
+    display: flex; /* Grid yerine Flex içinde Row mantığı */
+    flex-direction: column;
+    gap: 6px; /* Kutular arasındaki dikey boşluk */
     padding: 20px 0;
-    justify-content: center;
-    align-content: center;
+    align-items: center;
+    justify-content: center; /* Merkeze toplar, yaymaz */
+    flex-grow: 1; 
 }
 
 .row {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 8px;
+    display: flex; /* Yan yana kutular */
+    gap: 6px; /* Kutular arasındaki yatay boşluk */
 }
 
 .tile {
-    width: clamp(50px, 14vw, 62px);
-    height: clamp(50px, 14vw, 62px);
+    /* Kutular ekranın %14'ünü geçemez, max 58px olur */
+    width: clamp(45px, 14vw, 58px); 
+    height: clamp(45px, 14vw, 58px);
     border: 2px solid var(--tile-border);
-    border-radius: 4px; /* Hafif oval köşeler */
+    border-radius: 2px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2rem;
-    font-weight: 700;
-    transition: all 0.2s ease;
+    font-size: clamp(1.5rem, 6vw, 2rem);
+    font-weight: 800;
     background: rgba(255, 255, 255, 0.03);
+    transition: transform 0.1s ease;
 }
 
-.tile.filled {
-    border-color: #64748b;
-    transform: scale(1.05);
-}
-
-/* --- Renk Durumları --- */
+/* --- Durumlar --- */
+.tile.filled { border-color: #64748b; transform: scale(1.05); }
 .tile.correct { background: var(--correct) !important; border-color: var(--correct) !important; color: white; }
 .tile.present { background: var(--present) !important; border-color: var(--present) !important; color: white; }
 .tile.absent { background: var(--absent) !important; border-color: var(--absent) !important; opacity: 0.5; }
 
 /* --- Klavye --- */
 #keyboard {
-    margin-top: auto;
-    padding-bottom: 20px;
+    padding-bottom: 15px;
+    width: 100%;
 }
 
 .keyboard-row {
     display: flex;
     justify-content: center;
-    gap: 6px;
+    gap: 5px;
     margin-bottom: 8px;
+    width: 100%;
 }
 
 .key {
-    height: 58px;
+    height: 54px;
     background: #334155;
     color: white;
     border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 14px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: clamp(12px, 3vw, 14px);
     flex: 1;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.1s, background 0.2s;
-    box-shadow: 0 4px 0px #1e293b;
+    box-shadow: 0 3px 0px #1e293b;
 }
 
-.key:active, .key.active {
-    transform: translateY(2px);
-    box-shadow: 0 2px 0px #1e293b;
-    background: #475569;
-}
-
-.key.wide {
-    flex: 1.5;
-}
-
-.key.correct { background: var(--correct); box-shadow: 0 4px 0px #065f46; }
-.key.present { background: var(--present); box-shadow: 0 4px 0px #92400e; }
-.key.absent { background: #1e293b; opacity: 0.4; box-shadow: none; }
-
-/* --- Animasyonlar --- */
-@keyframes flip {
-    0% { transform: rotateX(0); }
-    50% { transform: rotateX(90deg); }
-    100% { transform: rotateX(0); }
-}
-
-.tile.flip { animation: flip 0.6s ease; }
-
-@keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    20%, 60% { transform: translateX(-4px); }
-    40%, 80% { transform: translateX(4px); }
-}
-
-.shake { animation: shake 0.4s; }
+.key.wide { flex: 1.5; }
+.key.active { transform: translateY(2px); box-shadow: none; }
 
 /* --- Mesajlar --- */
 #message-container {
     position: fixed;
-    top: 20%;
+    top: 15%;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 9999;
+    z-index: 1000;
 }
 
 .message {
-    background: #f8fafc;
-    color: #0f172a;
-    padding: 12px 24px;
-    border-radius: 8px;
+    background: white;
+    color: black;
+    padding: 10px 20px;
+    border-radius: 4px;
     font-weight: 800;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    opacity: 0;
-    transition: opacity 0.3s;
+    margin-bottom: 5px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
 }
 
-.message.show { opacity: 1; }
-
-/* --- Responsive Küçük Ekranlar --- */
-@media (max-height: 700px) {
-    h1 { font-size: 22px; }
-    .tile { width: 45px; height: 45px; font-size: 1.5rem; }
-    .key { height: 48px; }
-}
+/* Animasyonlar */
+@keyframes flip { 50% { transform: rotateX(90deg); } }
+.tile.flip { animation: flip 0.5s ease; }

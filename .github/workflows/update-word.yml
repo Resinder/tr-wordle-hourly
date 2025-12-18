@@ -1,0 +1,48 @@
+# Bu workflow, her saat başı çalışır ve yeni bir kelime seçer.
+name: Update Hourly Word
+
+on:
+  schedule:
+    # Her saat başı, dakika 0'da çalışır (UTC zamanına göre)
+    - cron: '0 * * * *'
+  # Ayrıca manuel olarak da tetiklenebilir
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Repository'i checkout eder
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. Node.js ortamını kurar
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      # 3. Kelimeyi seçen script'i çalıştırır
+      - name: Select new word
+        run: |
+          # Gist'ten kelime listesini indir
+          curl -o kelimeler.json "https://gist.githubusercontent.com/Resinder/b2897fd639006e34a1bf54252d730f7b/raw/b29034e404094142bfeb896e7e8e5aa50b6db46f/tdk-5-harfli-kelimeler.json"
+          
+          # Node.js script'ini çalıştırarak kelimeyi seç ve dosyaya yaz
+          node -e "
+            const fs = require('fs');
+            const kelimeler = JSON.parse(fs.readFileSync('kelimeler.json', 'utf-8'));
+            const rastgeleIndeks = Math.floor(Math.random() * kelimeler.length);
+            const secilenKelime = kelimeler[rastgeleIndeks];
+            const jsonVerisi = { kelime: secilenKelime, saat: new Date().toISOString() };
+            fs.writeFileSync('gizli-kelime.json', JSON.stringify(jsonVerisi, null, 2));
+            console.log('Yeni kelime:', secilenKelime);
+          "
+
+      # 4. Oluşturulan 'gizli-kelime.json' dosyasını repository'e commit'ler
+      - name: Commit and push if changed
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "Yeni saatlik kelime eklendi"
+          file_pattern: 'gizli-kelime.json'

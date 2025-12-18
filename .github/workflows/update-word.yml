@@ -8,21 +8,26 @@ on:
   # Ayrıca manuel olarak da tetiklenebilir
   workflow_dispatch:
 
+# ÖNEMLI: GitHub Actions'a yazma izni vermek için
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       # 1. Repository'i checkout eder
       - name: Checkout repository
         uses: actions/checkout@v3
-
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
       # 2. Node.js ortamını kurar
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-
+      
       # 3. Kelimeyi seçen script'i çalıştırır
       - name: Select new word
         run: |
@@ -39,10 +44,13 @@ jobs:
             fs.writeFileSync('gizli-kelime.json', JSON.stringify(jsonVerisi, null, 2));
             console.log('Yeni kelime:', secilenKelime);
           "
-
+      
       # 4. Oluşturulan 'gizli-kelime.json' dosyasını repository'e commit'ler
       - name: Commit and push if changed
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: "Yeni saatlik kelime eklendi"
           file_pattern: 'gizli-kelime.json'
+          commit_user_name: github-actions[bot]
+          commit_user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          commit_author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>

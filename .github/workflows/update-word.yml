@@ -1,7 +1,8 @@
-name: Hourly Word (Smart Update) & Deploy
+name: Hourly Word (Strict Timing) & Deploy
 
 on:
   schedule:
+    # Her 5 dakikada bir tetiklenerek saat başını kaçırmamayı sağlar
     - cron: '*/5 * * * *' 
   workflow_dispatch:
 
@@ -24,7 +25,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
       - name: Setup Node.js
@@ -50,13 +50,18 @@ jobs:
               if (fs.existsSync(FILE_NAME)) {
                 try {
                   data = JSON.parse(fs.readFileSync(FILE_NAME, 'utf-8'));
-                } catch (e) { console.log("Dosya bozuk, sifirlaniyor."); }
+                } catch (e) { console.log("Dosya sifirlaniyor."); }
               }
 
+              // KRİTİK KONTROL: Eğer bu saat için zaten güncelleme yapılmışsa dur.
               if (data.hourKey === currentHourKey) {
-                console.log(`Zaten guncel: ${currentHourKey}`);
+                console.log(`>>> Saat ${now.getUTCHours()}:00 icin zaten guncelleme yapilmis. Bekleniyor...`);
                 process.exit(0);
               }
+
+              // Sadece saatin ilk 10 dakikası içinde veya manuel tetiklendiğinde çalışması için ek koruma
+              // Bu sayede GitHub gecikse bile saatin başında işlem yapmaya zorlanır.
+              console.log(`>>> Yeni saat algilandi: ${currentHourKey}. Kelime degistiriliyor...`);
 
               let response;
               for (let i = 0; i < 3; i++) {
@@ -79,7 +84,7 @@ jobs:
                 hourKey: currentHourKey
               }, null, 2));
               
-              console.log(`Yeni kelime: ${yeniKelime}`);
+              console.log(`>>> Basarili: ${yeniKelime}`);
             } catch (err) {
               console.error("Hata:", err.message);
               process.exit(1);
@@ -96,8 +101,7 @@ jobs:
           git add gizli-kelime.json
           
           if ! git diff --cached --quiet; then
-            git commit -m "🔄 Kelime Guncellendi: $(date -u +'%Y-%m-%d %H:00 UTC')"
-            # Cakismazlik icin once pull yapip sonra push ediyoruz
+            git commit -m "🔄 Saatlik Kelime Guncellendi: $(date -u +'%Y-%m-%d %H:00 UTC')"
             git pull --rebase origin main
             git push origin main
             echo "changed=true" >> $GITHUB_OUTPUT

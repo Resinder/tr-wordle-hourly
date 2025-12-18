@@ -6,14 +6,16 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #121213;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+    background: linear-gradient(135deg, #0a0a0b 0%, #1a1a2e 100%);
     color: #ffffff;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: flex-start;
     min-height: 100vh;
-    padding: 10px;
+    padding: 0;
+    overflow-x: hidden;
 }
 
 /* Container */
@@ -23,38 +25,47 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 20px;
+    padding: 0 20px;
 }
 
 /* Header */
 header {
     width: 100%;
     text-align: center;
-    padding: 20px 0;
-    border-bottom: 1px solid #3a3a3c;
+    padding: 16px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 20px;
 }
 
 h1 {
-    font-size: 32px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    margin-bottom: 10px;
+    font-size: 36px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #ffffff 0%, #a8dadc 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 0 30px rgba(168, 218, 220, 0.3);
 }
 
 #timer {
-    font-size: 14px;
-    color: #818384;
+    font-size: 13px;
+    color: #9ca3af;
+    font-weight: 500;
+    letter-spacing: 0.5px;
 }
 
 #timer span {
     color: #6aaa64;
-    font-weight: 600;
+    font-weight: 700;
+    font-size: 15px;
 }
 
 /* Mesaj Alanı */
 #message-container {
     position: fixed;
-    top: 80px;
+    top: 100px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 1000;
@@ -62,38 +73,42 @@ h1 {
     flex-direction: column;
     gap: 10px;
     pointer-events: none;
+    width: 90%;
+    max-width: 400px;
 }
 
 .message {
-    background-color: #ffffff;
-    color: #121213;
-    padding: 12px 24px;
-    border-radius: 8px;
+    background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%);
+    color: #1f2937;
+    padding: 16px 24px;
+    border-radius: 12px;
     font-weight: 600;
-    font-size: 14px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    font-size: 15px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
     opacity: 0;
-    transform: translateY(-20px);
-    transition: all 0.3s ease;
+    transform: translateY(-20px) scale(0.9);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    text-align: center;
 }
 
 .message.show {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
 }
 
 /* Oyun Tahtası */
 #game-board {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: repeat(6, 1fr);
     gap: 5px;
-    margin: 20px 0;
+    margin: 20px 0 30px 0;
+    padding: 10px;
 }
 
 .row {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
     gap: 5px;
-    justify-content: center;
 }
 
 .tile {
@@ -104,30 +119,49 @@ h1 {
     align-items: center;
     justify-content: center;
     font-size: 32px;
-    font-weight: 700;
+    font-weight: 900;
     text-transform: uppercase;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
+    position: relative;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.tile::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 2px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 100%);
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.tile:hover::before {
+    opacity: 1;
 }
 
 .tile.filled {
     border-color: #565758;
-    animation: pop 0.1s ease;
+    animation: pop 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform: scale(1.05);
 }
 
 .tile.correct {
-    background-color: #6aaa64;
+    background: linear-gradient(135deg, #6aaa64 0%, #5a9a54 100%);
     border-color: #6aaa64;
     color: #ffffff;
+    box-shadow: 0 4px 12px rgba(106, 170, 100, 0.4);
 }
 
 .tile.present {
-    background-color: #c9b458;
+    background: linear-gradient(135deg, #c9b458 0%, #b9a448 100%);
     border-color: #c9b458;
     color: #ffffff;
+    box-shadow: 0 4px 12px rgba(201, 180, 88, 0.4);
 }
 
 .tile.absent {
-    background-color: #3a3a3c;
+    background: linear-gradient(135deg, #3a3a3c 0%, #2a2a2c 100%);
     border-color: #3a3a3c;
     color: #ffffff;
 }
@@ -139,7 +173,7 @@ h1 {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    margin-bottom: 20px;
+    padding: 0 8px 20px 8px;
 }
 
 .keyboard-row {
@@ -149,11 +183,11 @@ h1 {
 }
 
 .key {
-    background-color: #818384;
+    background: linear-gradient(135deg, #818384 0%, #6a6b6c 100%);
     color: #ffffff;
     border: none;
-    border-radius: 4px;
-    font-size: 13px;
+    border-radius: 6px;
+    font-size: 14px;
     font-weight: 700;
     padding: 0;
     cursor: pointer;
@@ -163,16 +197,29 @@ h1 {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.1s ease;
+    transition: all 0.15s ease;
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2), 0 1px 0 rgba(255, 255, 255, 0.1) inset;
+    position: relative;
+}
+
+.key::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 6px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 100%);
+    pointer-events: none;
 }
 
 .key:hover {
-    filter: brightness(1.1);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.1) inset;
 }
 
 .key:active,
 .key.active {
-    transform: scale(0.95);
+    transform: translateY(0);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2), 0 1px 0 rgba(255, 255, 255, 0.1) inset;
 }
 
 .key.wide {
@@ -181,101 +228,187 @@ h1 {
 }
 
 .key.correct {
-    background-color: #6aaa64;
+    background: linear-gradient(135deg, #6aaa64 0%, #5a9a54 100%);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2), 0 0 12px rgba(106, 170, 100, 0.4);
 }
 
 .key.present {
-    background-color: #c9b458;
+    background: linear-gradient(135deg, #c9b458 0%, #b9a448 100%);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2), 0 0 12px rgba(201, 180, 88, 0.4);
 }
 
 .key.absent {
-    background-color: #3a3a3c;
+    background: linear-gradient(135deg, #3a3a3c 0%, #2a2a2c 100%);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
 }
 
 /* Animasyonlar */
 @keyframes pop {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(1); }
+    0% { 
+        transform: scale(1); 
+    }
+    50% { 
+        transform: scale(1.15); 
+    }
+    100% { 
+        transform: scale(1.05); 
+    }
 }
 
 @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-    20%, 40%, 60%, 80% { transform: translateX(5px); }
+    0%, 100% { 
+        transform: translateX(0); 
+    }
+    10%, 30%, 50%, 70%, 90% { 
+        transform: translateX(-8px); 
+    }
+    20%, 40%, 60%, 80% { 
+        transform: translateX(8px); 
+    }
 }
 
 .shake {
-    animation: shake 0.5s;
+    animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97);
 }
 
 @keyframes flip {
-    0% { transform: rotateX(0); }
-    50% { transform: rotateX(90deg); }
-    100% { transform: rotateX(0); }
+    0% { 
+        transform: rotateX(0); 
+    }
+    50% { 
+        transform: rotateX(90deg); 
+    }
+    100% { 
+        transform: rotateX(0); 
+    }
 }
 
 .flip {
-    animation: flip 0.5s;
+    animation: flip 0.6s cubic-bezier(0.45, 0.05, 0.55, 0.95);
 }
 
 @keyframes bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-20px); }
+    0%, 100% { 
+        transform: translateY(0) scale(1); 
+    }
+    25% { 
+        transform: translateY(-20px) scale(1.1); 
+    }
+    50% { 
+        transform: translateY(-10px) scale(1.05); 
+    }
+    75% { 
+        transform: translateY(-15px) scale(1.08); 
+    }
 }
 
 .bounce {
-    animation: bounce 0.5s ease-in-out;
+    animation: bounce 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes glow {
+    0%, 100% {
+        box-shadow: 0 0 5px rgba(106, 170, 100, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(106, 170, 100, 0.8), 0 0 30px rgba(106, 170, 100, 0.6);
+    }
 }
 
 /* Responsive Tasarım - Tablet */
 @media (max-width: 600px) {
     h1 {
-        font-size: 24px;
+        font-size: 28px;
+        letter-spacing: 1.5px;
     }
 
     .tile {
-        width: 52px;
-        height: 52px;
+        width: 54px;
+        height: 54px;
         font-size: 28px;
     }
 
     .key {
-        min-width: 32px;
-        height: 48px;
-        font-size: 11px;
+        min-width: 36px;
+        height: 52px;
+        font-size: 12px;
     }
 
     .key.wide {
-        min-width: 55px;
-        font-size: 10px;
+        min-width: 58px;
+        font-size: 11px;
+    }
+
+    #message-container {
+        top: 90px;
     }
 }
 
 /* Responsive Tasarım - Mobil */
 @media (max-width: 400px) {
-    .tile {
-        width: 46px;
-        height: 46px;
+    h1 {
         font-size: 24px;
     }
 
+    .tile {
+        width: 48px;
+        height: 48px;
+        font-size: 24px;
+        border-width: 1.5px;
+    }
+
     .key {
-        min-width: 28px;
+        min-width: 30px;
+        height: 46px;
+        font-size: 11px;
+        gap: 4px;
+    }
+
+    .key.wide {
+        min-width: 50px;
+        font-size: 10px;
+    }
+
+    #keyboard {
+        gap: 6px;
+    }
+
+    .keyboard-row {
+        gap: 4px;
+    }
+
+    #message-container {
+        top: 80px;
+    }
+
+    .message {
+        padding: 12px 20px;
+        font-size: 14px;
+    }
+}
+
+/* Ekstra küçük ekranlar */
+@media (max-width: 350px) {
+    .tile {
+        width: 42px;
+        height: 42px;
+        font-size: 20px;
+    }
+
+    .key {
+        min-width: 26px;
         height: 42px;
         font-size: 10px;
     }
 
     .key.wide {
-        min-width: 48px;
-    }
-
-    #message-container {
-        top: 70px;
+        min-width: 44px;
     }
 }
 
-/* Koyu Tema (Opsiyonel - zaten koyu) */
-@media (prefers-color-scheme: light) {
-    /* İsteğe bağlı açık tema desteği eklenebilir */
+/* Koyu tema için ekstra efektler */
+@media (prefers-color-scheme: dark) {
+    body {
+        background: linear-gradient(135deg, #0a0a0b 0%, #16213e 100%);
+    }
 }

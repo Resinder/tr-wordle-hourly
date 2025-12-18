@@ -1,4 +1,4 @@
-name: Hourly Word (Reliable Check) & Deploy
+name: Hourly Word (Smart Update) & Deploy
 
 on:
   schedule:
@@ -6,7 +6,7 @@ on:
     - cron: '*/5 * * * *' 
   workflow_dispatch:
 
-# Çakışmaları önlemek için aynı anda sadece bir işin çalışmasını sağlar
+# Aynı anda birden fazla işin çalışmasını engelleyerek çakışmaları önler
 concurrency:
   group: "word-update"
   cancel-in-progress: true
@@ -19,11 +19,15 @@ permissions:
 jobs:
   check-and-update:
     runs-on: ubuntu-latest
+    # Deployment adımlarının bu job içindeki değişkenlere erişebilmesi için output tanımlıyoruz
+    outputs:
+      HAS_CHANGES: ${{ steps.commit_step.outputs.changed }}
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Tüm geçmişi çekerek git işlemlerini garantiye alır
+          fetch-depth: 0 # Git geçmişini tam çekerek push hatalarını önler
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -31,7 +35,7 @@ jobs:
           node-version: '20'
 
       - name: Process Word Update
-        id: update_step
+        id: process_step
         run: |
           node << 'EOF'
           const fs = require('fs');
@@ -41,12 +45,11 @@ jobs:
             const FILE_NAME = 'gizli-kelime.json';
             
             const now = new Date();
-            // "YYYY-MM-DD-HH" formatında bir anahtar oluşturuyoruz
+            // "YYYY-MM-DD-HH" formatında bir anahtar oluşturuyoruz (Örn: 2025-11-18-19)
             const currentHourKey = `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}-${now.getUTCHours()}`;
 
             try {
               let data = { kelime: "", hourKey: "" };
-              
               if (fs.existsSync(FILE_NAME)) {
                 try {
                   data = JSON.parse(fs.readFileSync(FILE_NAME, 'utf-8'));
@@ -56,12 +59,12 @@ jobs:
               // KONTROL: Eğer hourKey eşleşiyorsa bu saatte zaten işlem yapılmış demektir
               if (data.hourKey === currentHourKey) {
                 console.log(`>>> ${currentHourKey} saati için zaten güncel. İşlem yapılmıyor.`);
-                process.exit(0); 
+                process.exit(0);
               }
 
-              console.log(`>>> Yeni saat algılandı (${currentHourKey}). Kelime çekiliyor...`);
+              console.log(`>>> Yeni saat algılandı (${currentHourKey}). Veri çekiliyor...`);
               
-              // Retry (Yeniden Deneme) Mekanizması
+              // Retry Mekanizması: Bağlantı hatası olursa 3 kez dener
               let response;
               for (let i = 0; i < 3; i++) {
                 try {
@@ -76,14 +79,13 @@ jobs:
                 yeniKelime = kelimeler[Math.floor(Math.random() * kelimeler.length)].toLocaleUpperCase('tr-TR');
               } while (yeniKelime === data.kelime && kelimeler.length > 1);
 
-              const output = {
+              fs.writeFileSync(FILE_NAME, JSON.stringify({
                 kelime: yeniKelime,
                 saat: now.toISOString(),
                 timestamp: now.getTime(),
-                hourKey: currentHourKey // Bir sonraki kontroller için anahtar
-              };
-
-              fs.writeFileSync(FILE_NAME, JSON.stringify(output, null, 2));
+                hourKey: currentHourKey
+              }, null, 2));
+              
               console.log(`>>> BAŞARILI: Yeni kelime "${yeniKelime}"`);
             } catch (err) {
               console.error(">>> KRİTİK HATA:", err.message);
@@ -94,23 +96,32 @@ jobs:
           EOF
 
       - name: Commit and Push
+        id: commit_step
         run: |
           git config --local user.name "github-actions[bot]"
-          git config --local woman.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git add gizli-kelime.json
+          
           if ! git diff --cached --quiet; then
             git commit -m "🔄 Kelime Güncellendi: $(date -u +'%Y-%m-%d %H:00 UTC')"
             git push origin main
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
           fi
 
+      # --- SADECE KELİME DEĞİŞTİYSE ÇALIŞACAK DEPLOY ADIMLARI ---
+      
       - name: Deployment Setup
-        if: success()
+        if: steps.commit_step.outputs.changed == 'true'
         uses: actions/configure-pages@v4
 
       - name: Upload Artifacts
+        if: steps.commit_step.outputs.changed == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: '.'
 
       - name: Deploy to GitHub Pages
+        if: steps.commit_step.outputs.changed == 'true'
         uses: actions/deploy-pages@v4

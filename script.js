@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let mevcutSatir = 0;
     let mevcutKaro = 0;
     let oyunBitti = false;
-    let tahminler = [];
 
     const gameBoard = document.getElementById('game-board');
     const klavye = document.getElementById('keyboard');
@@ -54,14 +53,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Sonra kelime listesini kontrol için yükle
-            const kelimelerResponse = await fetch(kelimelerGistURL);
-            if (!kelimelerResponse.ok) {
+            try {
+                const kelimelerResponse = await fetch(kelimelerGistURL);
+                if (kelimelerResponse.ok) {
+                    kelimeler = await kelimelerResponse.json();
+                    kelimeler = kelimeler.map(k => k.toLowerCase());
+                }
+            } catch (error) {
                 console.warn("Kelime listesi yüklenemedi, tüm tahminler kabul edilecek.");
-                kelimeler = [];
-            } else {
-                kelimeler = await kelimelerResponse.json();
-                // Normalize et - küçük harfe çevir
-                kelimeler = kelimeler.map(k => k.toLowerCase());
             }
             
             oyunTahtasiniOlustur();
@@ -76,11 +75,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Oyun başlatılırken hata:", error);
             document.body.innerHTML = `
-                <div style="color: white; text-align: center; margin-top: 50px; padding: 20px;">
-                    <h1>😔 Oyun Yüklenemedi</h1>
-                    <p style="font-size: 18px; margin: 20px 0;">${error.message}</p>
+                <div style="color: white; text-align: center; margin-top: 50px; padding: 20px; max-width: 500px; margin-left: auto; margin-right: auto;">
+                    <h1 style="font-size: 32px; margin-bottom: 20px;">😔 Oyun Yüklenemedi</h1>
+                    <p style="font-size: 18px; margin: 20px 0; line-height: 1.6;">${error.message}</p>
                     <p style="margin-top: 30px;">Lütfen daha sonra tekrar deneyin veya sayfayı yenileyin.</p>
-                    <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; font-size: 16px; cursor: pointer; background: #6aaa64; color: white; border: none; border-radius: 5px;">
+                    <button onclick="location.reload()" style="margin-top: 20px; padding: 12px 24px; font-size: 16px; cursor: pointer; background: #6aaa64; color: white; border: none; border-radius: 5px; font-weight: 600;">
                         🔄 Sayfayı Yenile
                     </button>
                 </div>
@@ -98,7 +97,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const dakika = Math.floor((fark % (1000 * 60 * 60)) / (1000 * 60));
             const saniye = Math.floor((fark % (1000 * 60)) / 1000);
 
-            timerSpan.textContent = `${String(dakika).padStart(2, '0')}:${String(saniye).padStart(2, '0')}`;
+            if (timerSpan) {
+                timerSpan.textContent = `${String(dakika).padStart(2, '0')}:${String(saniye).padStart(2, '0')}`;
+            }
         };
 
         guncelle();
@@ -107,7 +108,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Oyun Tahtası ve Arayüz ---
     function oyunTahtasiniOlustur() {
-        gameBoard.innerHTML = ''; // Temizle
+        if (!gameBoard) return;
+        
+        gameBoard.innerHTML = '';
         
         for (let i = 0; i < MAX_GUESSES; i++) {
             const satirDiv = document.createElement('div');
@@ -125,6 +128,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function mesajGoster(text, duration = 2000) {
+        if (!messageContainer) return;
+        
         const mesajDiv = document.createElement('div');
         mesajDiv.classList.add('message');
         mesajDiv.textContent = text;
@@ -149,16 +154,11 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (mevcutKaro < WORD_LENGTH && mevcutSatir < MAX_GUESSES) {
             const karo = document.getElementById(`tile-${mevcutSatir}-${mevcutKaro}`);
-            karo.textContent = harf;
-            karo.classList.add('filled');
-            
-            // Pop animasyonu
-            karo.style.animation = 'pop 0.1s';
-            setTimeout(() => {
-                karo.style.animation = '';
-            }, 100);
-            
-            mevcutKaro++;
+            if (karo) {
+                karo.textContent = harf;
+                karo.classList.add('filled');
+                mevcutKaro++;
+            }
         }
     }
 
@@ -168,8 +168,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (mevcutKaro > 0 && mevcutSatir < MAX_GUESSES) {
             mevcutKaro--;
             const karo = document.getElementById(`tile-${mevcutSatir}-${mevcutKaro}`);
-            karo.textContent = '';
-            karo.classList.remove('filled');
+            if (karo) {
+                karo.textContent = '';
+                karo.classList.remove('filled');
+            }
         }
     }
 
@@ -185,7 +187,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const tahmin = [];
         for (let i = 0; i < WORD_LENGTH; i++) {
             const karo = document.getElementById(`tile-${mevcutSatir}-${i}`);
-            tahmin.push(karo.textContent);
+            if (karo) {
+                tahmin.push(karo.textContent);
+            }
         }
         const tahminString = tahmin.join('');
 
@@ -196,12 +200,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        tahminler.push(tahminString);
         await tahminiIsle(tahminString);
         
         if (tahminString === hedefKelime) {
             oyunBitti = true;
-            // Kazanma mesajı için kısa gecikme
             setTimeout(() => {
                 mesajGoster('🎉 Tebrikler! Kelimeyi buldunuz!', 5000);
                 celebrateWin();
@@ -222,19 +224,22 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function shakeRow(rowIndex) {
         const row = document.getElementById(`row-${rowIndex}`);
-        row.classList.add('shake');
-        setTimeout(() => {
-            row.classList.remove('shake');
-        }, 500);
+        if (row) {
+            row.classList.add('shake');
+            setTimeout(() => {
+                row.classList.remove('shake');
+            }, 500);
+        }
     }
 
     function celebrateWin() {
-        // Kazanan satırın kutularını dans ettir
         for (let i = 0; i < WORD_LENGTH; i++) {
             const karo = document.getElementById(`tile-${mevcutSatir}-${i}`);
-            setTimeout(() => {
-                karo.classList.add('bounce');
-            }, i * 100);
+            if (karo) {
+                setTimeout(() => {
+                    karo.classList.add('bounce');
+                }, i * 100);
+            }
         }
     }
 
@@ -271,25 +276,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const key = document.querySelector(`[data-key="${tahminHarfleri[i]}"]`);
             
             setTimeout(() => {
-                karo.classList.add('flip');
-                
-                setTimeout(() => {
-                    karo.classList.add(sonuc[i]);
-                    karo.classList.remove('flip');
+                if (karo) {
+                    karo.classList.add('flip');
                     
-                    // Klavye tuşunu güncelle - öncelik sırası: correct > present > absent
-                    if (key) {
-                        if (sonuc[i] === 'correct') {
-                            key.classList.remove('present', 'absent');
-                            key.classList.add('correct');
-                        } else if (sonuc[i] === 'present' && !key.classList.contains('correct')) {
-                            key.classList.remove('absent');
-                            key.classList.add('present');
-                        } else if (sonuc[i] === 'absent' && !key.classList.contains('correct') && !key.classList.contains('present')) {
-                            key.classList.add('absent');
-                        }
+                    setTimeout(() => {
+                        karo.classList.add(sonuc[i]);
+                        karo.classList.remove('flip');
+                    }, 250);
+                }
+                
+                // Klavye tuşunu güncelle
+                if (key) {
+                    if (sonuc[i] === 'correct') {
+                        key.classList.remove('present', 'absent');
+                        key.classList.add('correct');
+                    } else if (sonuc[i] === 'present' && !key.classList.contains('correct')) {
+                        key.classList.remove('absent');
+                        key.classList.add('present');
+                    } else if (sonuc[i] === 'absent' && !key.classList.contains('correct') && !key.classList.contains('present')) {
+                        key.classList.add('absent');
                     }
-                }, 250);
+                }
             }, i * 300);
         }
 
@@ -338,62 +345,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
-    
-    // CSS animasyonlarını ekle
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-            20%, 40%, 60%, 80% { transform: translateX(5px); }
-        }
-        
-        @keyframes pop {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-        
-        @keyframes flip {
-            0% { transform: rotateX(0); }
-            50% { transform: rotateX(90deg); }
-            100% { transform: rotateX(0); }
-        }
-        
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-20px); }
-        }
-        
-        .shake {
-            animation: shake 0.5s;
-        }
-        
-        .flip {
-            animation: flip 0.5s;
-        }
-        
-        .bounce {
-            animation: bounce 0.5s ease-in-out;
-        }
-        
-        .message {
-            opacity: 0;
-            transform: translateY(-20px);
-            transition: all 0.3s ease;
-        }
-        
-        .message.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
-        
-        button.active {
-            transform: scale(0.95);
-            transition: transform 0.1s;
-        }
-    `;
-    document.head.appendChild(style);
 
     // Oyunu Başlat
     init();

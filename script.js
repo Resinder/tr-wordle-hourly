@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- Sabitler ve Değişkenler ---
     const WORD_LENGTH = 5;
     const MAX_GUESSES = 6;
     const ANIMATION_DURATION = 300; 
@@ -11,80 +10,78 @@ document.addEventListener('DOMContentLoaded', () => {
     let mevcutSatir = 0;
     let mevcutKaro = 0;
     let oyunBitti = false;
-    let guesses = []; // LocalStorage takibi için
+    let guesses = [];
 
     const gameBoard = document.getElementById('game-board');
     const klavye = document.getElementById('keyboard');
     const messageContainer = document.getElementById('message-container');
     const timerSpan = document.querySelector('#timer span');
 
-    // --- Başlangıç Fonksiyonları ---
     async function init() {
-        console.log('🎮 Oyun optimize edilmiş modda başlatılıyor...');
         try {
             oyunTahtasiniOlustur();
-            
-            // Gizli kelimeyi yükle (Saatlik Cache Bypass)
-            const cacheBuster = `?t=${Math.floor(Date.now() / 3600000)}`;
+            const cacheBuster = `?t=${Date.now()}`;
             const gizliKelimeResponse = await fetch(gizliKelimeURL + cacheBuster);
             if (!gizliKelimeResponse.ok) throw new Error("Kelime dosyası bulunamadı.");
 
             const gizliKelimeData = await gizliKelimeResponse.json();
-            hedefKelime = gizliKelimeData.kelime.toLocaleUpperCase('tr-TR').trim();
+            hedefKelime = gizliKelimeData.kelime.trim().toLocaleUpperCase('tr-TR');
 
-            // Sözlük listesini yükle
             const kelimelerResponse = await fetch(kelimelerGistURL);
             if (kelimelerResponse.ok) {
                 const liste = await kelimelerResponse.json();
-                kelimeler = liste.map(k => k.toLocaleLowerCase('tr-TR').trim());
+                kelimeler = liste.map(k => k.trim().toLocaleLowerCase('tr-TR'));
             }
 
             klavyeOlayDinleyicileriEkle();
             geriSayimiBaslat();
-            
-            // Mevcut saatteki ilerlemeyi geri yükle
             await loadGameState();
-
         } catch (error) {
-            console.error("❌ Başlatma Hatası:", error);
-            renderErrorUI(error.message);
+            console.error("Başlatma Hatası:", error);
         }
     }
 
-    // --- Local Storage (Kayıt Sistemi) ---
-    function saveGameState() {
-        const state = {
-            target: hedefKelime,
-            guesses: guesses,
-            hour: new Date().getHours(),
-            date: new Date().toDateString()
-        };
-        localStorage.setItem('tr-wordle-hourly-state', JSON.stringify(state));
-    }
+    async function tahminiIsle(tahmin, isLoading) {
+        const row = document.getElementById(`row-${mevcutSatir}`);
+        const tiles = Array.from(row.children);
+        
+        const hedef = hedefKelime.toLocaleUpperCase('tr-TR');
+        const tahm = tahmin.toLocaleUpperCase('tr-TR');
+        const hedefHarfler = hedef.split('');
+        const tahminHarfler = tahm.split('');
+        
+        const sonuc = new Array(WORD_LENGTH).fill('absent');
+        const harfHavuzu = {};
 
-    async function loadGameState() {
-        const saved = localStorage.getItem('tr-wordle-hourly-state');
-        if (!saved) return;
+        hedefHarfler.forEach(h => harfHavuzu[h] = (harfHavuzu[h] || 0) + 1);
 
-        const state = JSON.parse(saved);
-        const now = new Date();
-
-        // Eğer saat veya gün değişmişse eski kaydı temizle
-        if (state.hour !== now.getHours() || state.date !== now.toDateString() || state.target !== hedefKelime) {
-            localStorage.removeItem('tr-wordle-hourly-state');
-            return;
-        }
-
-        // Eski tahminleri sessizce doldur
-        for (const guess of state.guesses) {
-            for (const char of guess) {
-                harfEkle(char, true); // true: sessiz ekleme
+        tahminHarfler.forEach((h, i) => {
+            if (h === hedefHarfler[i]) {
+                sonuc[i] = 'correct';
+                harfHavuzu[h]--;
             }
-            await tahminiGonder(true); // true: yükleme modu
+        });
+
+        tahminHarfler.forEach((h, i) => {
+            if (sonuc[i] !== 'correct' && harfHavuzu[h] > 0 && hedefHarfler.includes(h)) {
+                sonuc[i] = 'present';
+                harfHavuzu[h]--;
+            }
+        });
+
+        for (let i = 0; i < WORD_LENGTH; i++) {
+            const tile = tiles[i];
+            if (!isLoading) await new Promise(r => setTimeout(r, ANIMATION_DURATION));
+            
+            tile.classList.add('flip');
+            setTimeout(() => {
+                tile.classList.add(sonuc[i]);
+                klavyeGuncelle(tahminHarfler[i], sonuc[i]);
+            }, 250);
         }
+        if (!isLoading) await new Promise(r => setTimeout(r, 500));
     }
 
-    // --- Oyun Mantığı ---
     function harfEkle(harf, silent = false) {
         if (oyunBitti || mevcutKaro >= WORD_LENGTH) return;
         const turkceHarf = harf.toLocaleUpperCase('tr-TR');
@@ -92,11 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (karo) {
             karo.textContent = turkceHarf;
             karo.classList.add('filled');
-            if (!silent) {
-                karo.style.animation = 'none';
-                karo.offsetHeight; // reflow
-                karo.style.animation = 'pop 0.1s ease-in-out';
-            }
             mevcutKaro++;
         }
     }
@@ -105,35 +97,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (oyunBitti || mevcutKaro <= 0) return;
         mevcutKaro--;
         const karo = document.getElementById(`tile-${mevcutSatir}-${mevcutKaro}`);
-        if (karo) {
-            karo.textContent = '';
-            karo.classList.remove('filled');
-        }
+        karo.textContent = '';
+        karo.classList.remove('filled');
     }
 
     async function tahminiGonder(isLoading = false) {
-        if (oyunBitti || mevcutKaro !== WORD_LENGTH) {
-            if (!isLoading && mevcutKaro !== WORD_LENGTH) {
-                mesajGoster('Yeterli harf yok');
-                shakeRow(mevcutSatir);
-            }
-            return;
-        }
+        if (oyunBitti || mevcutKaro !== WORD_LENGTH) return;
 
         const tahmin = Array.from({length: WORD_LENGTH}, (_, i) => 
             document.getElementById(`tile-${mevcutSatir}-${i}`).textContent
         ).join('');
 
-        const normalizedTahmin = tahmin.toLocaleLowerCase('tr-TR');
-        
-        // Sözlük kontrolü (Yükleme aşamasında yapılmaz)
-        if (!isLoading && kelimeler.length > 0 && !kelimeler.includes(normalizedTahmin)) {
-            mesajGoster('Sözlükte yok');
-            shakeRow(mevcutSatir);
-            return;
-        }
-
         if (!isLoading) {
+            const normalizedTahmin = tahmin.toLocaleLowerCase('tr-TR');
+            if (kelimeler.length > 0 && !kelimeler.includes(normalizedTahmin)) {
+                mesajGoster('Sözlükte yok');
+                shakeRow(mevcutSatir);
+                return;
+            }
             guesses.push(tahmin);
             saveGameState();
         }
@@ -142,14 +123,13 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (tahmin === hedefKelime) {
             oyunBitti = true;
-            if (!isLoading) mesajGoster('🎉 Harika!', 5000);
-            celebrateWin();
+            if (!isLoading) celebrateWin();
             return;
         }
 
         if (mevcutSatir + 1 >= MAX_GUESSES) {
             oyunBitti = true;
-            if (!isLoading) mesajGoster(`😔 Kelime: ${hedefKelime}`, 5000);
+            if (!isLoading) mesajGoster(`Kelime: ${hedefKelime}`, 5000);
             return;
         }
 
@@ -157,61 +137,30 @@ document.addEventListener('DOMContentLoaded', () => {
         mevcutKaro = 0;
     }
 
-    async function tahminiIsle(tahmin, isLoading) {
-        const row = document.getElementById(`row-${mevcutSatir}`);
-        const tiles = Array.from(row.children);
-        const hedefHarfler = hedefKelime.split('');
-        const sonuc = new Array(WORD_LENGTH).fill('absent');
-        const harfHavuzu = {};
-
-        // Harf sayılarını hesapla (Çift harf mantığı için)
-        hedefHarfler.forEach(h => harfHavuzu[h] = (harfHavuzu[h] || 0) + 1);
-
-        // 1. Adım: Tam eşleşmeler (Yeşil)
-        tahmin.split('').forEach((h, i) => {
-            if (h === hedefHarfler[i]) {
-                sonuc[i] = 'correct';
-                harfHavuzu[h]--;
-            }
-        });
-
-        // 2. Adım: Var olan ama yanlış yerdeki harfler (Sarı)
-        tahmin.split('').forEach((h, i) => {
-            if (sonuc[i] !== 'correct' && harfHavuzu[h] > 0 && hedefHarfler.includes(h)) {
-                sonuc[i] = 'present';
-                harfHavuzu[h]--;
-            }
-        });
-
-        // Animasyon ve Renklendirme
-        for (let i = 0; i < WORD_LENGTH; i++) {
-            const tile = tiles[i];
-            if (!isLoading) await new Promise(r => setTimeout(r, ANIMATION_DURATION));
-            
-            tile.classList.add('flip');
-            setTimeout(() => {
-                tile.classList.add(sonuc[i]);
-                klavyeGuncelle(tahmin[i], sonuc[i]);
-            }, 250);
-        }
-
-        if (!isLoading) await new Promise(r => setTimeout(r, 500));
-    }
-
     function klavyeGuncelle(harf, durum) {
         const key = document.querySelector(`[data-key="${harf}"]`);
         if (!key) return;
+        if (durum === 'correct') key.className = 'key correct';
+        else if (durum === 'present' && !key.classList.contains('correct')) key.className = 'key present';
+        else if (durum === 'absent' && !key.classList.contains('correct') && !key.classList.contains('present')) key.className = 'key absent';
+    }
 
-        if (durum === 'correct') {
-            key.className = 'key correct';
-        } else if (durum === 'present' && !key.classList.contains('correct')) {
-            key.className = 'key present';
-        } else if (durum === 'absent' && !key.classList.contains('correct') && !key.classList.contains('present')) {
-            key.className = 'key absent';
+    function saveGameState() {
+        const state = { target: hedefKelime, guesses: guesses, hour: new Date().getHours(), date: new Date().toDateString() };
+        localStorage.setItem('tr-wordle-state', JSON.stringify(state));
+    }
+
+    async function loadGameState() {
+        const saved = localStorage.getItem('tr-wordle-state');
+        if (!saved) return;
+        const state = JSON.parse(saved);
+        if (state.hour !== new Date().getHours() || state.target !== hedefKelime) return;
+        for (const guess of state.guesses) {
+            for (const char of guess) harfEkle(char, true);
+            await tahminiGonder(true);
         }
     }
 
-    // --- Arayüz ve Yardımcılar ---
     function oyunTahtasiniOlustur() {
         gameBoard.innerHTML = '';
         for (let i = 0; i < MAX_GUESSES; i++) {
@@ -229,24 +178,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function klavyeOlayDinleyicileriEkle() {
-        // Fiziksel Klavye + Ekrandaki tuş animasyonu senkronu
         document.addEventListener('keydown', (e) => {
             if (oyunBitti) return;
             const key = e.key === 'Enter' ? 'ENTER' : e.key === 'Backspace' ? 'BACKSPACE' : e.key.toLocaleUpperCase('tr-TR');
-            
-            // Ekrandaki tuşu bul ve "active" efekti ver
-            const visualKey = document.querySelector(`[data-key="${key}"]`);
-            if (visualKey) {
-                visualKey.classList.add('active');
-                setTimeout(() => visualKey.classList.remove('active'), 100);
-            }
-
             if (key === 'ENTER') tahminiGonder();
             else if (key === 'BACKSPACE') harfSil();
             else if (/^[A-ZÇĞİÖŞÜ]$/.test(key)) harfEkle(key);
         });
 
-        // Ekran Klavyesi
         klavye.addEventListener('click', (e) => {
             const btn = e.target.closest('button');
             if (!btn || oyunBitti) return;
@@ -258,15 +197,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function geriSayimiBaslat() {
-        const update = () => {
+        setInterval(() => {
             const now = new Date();
-            const diff = new Date(now).setHours(now.getHours() + 1, 0, 0, 0) - now;
-            const m = Math.floor((diff % 3600000) / 60000);
-            const s = Math.floor((diff % 60000) / 1000);
-            if (timerSpan) timerSpan.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-        };
-        update();
-        setInterval(update, 1000);
+            const next = new Date(now).setHours(now.getHours() + 1, 0, 0, 0);
+            const diff = next - now;
+            const m = Math.floor((diff / 60000) % 60);
+            const s = Math.floor((diff / 1000) % 60);
+            timerSpan.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }, 1000);
     }
 
     function mesajGoster(t, d = 2000) {
@@ -274,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
         m.className = 'message show';
         m.textContent = t;
         messageContainer.appendChild(m);
-        setTimeout(() => { m.classList.remove('show'); setTimeout(() => m.remove(), 300); }, d);
+        setTimeout(() => { m.remove(); }, d);
     }
 
     function shakeRow(i) {
@@ -288,10 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
         Array.from(r.children).forEach((t, i) => {
             setTimeout(() => t.classList.add('bounce'), i * 100);
         });
-    }
-
-    function renderErrorUI(msg) {
-        gameBoard.innerHTML = `<div class="error-container"><h2>😟 Hata</h2><p>${msg}</p><button onclick="location.reload()">Yenile</button></div>`;
+        mesajGoster('TEBRİKLER!', 5000);
     }
 
     init();

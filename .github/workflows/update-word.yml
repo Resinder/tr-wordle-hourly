@@ -1,98 +1,217 @@
-name: Hourly Word (Reliable Update) & Deploy
+name: 🔄 Saatlik Kelime Güncelleyici
 
 on:
   schedule:
-    # GitHub gecikmelerini kompanse etmek için her 5 dakikada bir kontrol et
+    # Her 5 dakikada kontrol eder, saat başında günceller
     - cron: '*/5 * * * *'
   workflow_dispatch:
+    inputs:
+      force_update:
+        description: 'Zorla güncelleme yap (aynı saat içinde bile)'
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
-  group: "word-update"
-  cancel-in-progress: false # Devam eden süreci iptal etme, Pages deploy bitsin
+  group: word-update-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
   pages: write
   id-token: write
 
+env:
+  GIST_URL: 'https://gist.githubusercontent.com/Resinder/b2897fd639006e34a1bf54252d730f7b/raw/tdk-5-harfli-kelimeler.json'
+  WORD_FILE: 'gizli-kelime.json'
+
 jobs:
-  check-and-update:
+  update-word:
+    name: Kelime Güncelle
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout repository
+      - name: 📥 Repository İndir
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-          persist-credentials: true 
+          persist-credentials: true
+          fetch-depth: 0
 
-      - name: Process Word Update
-        id: process_step
+      - name: 🔧 Node.js Kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 🎲 Yeni Kelime Seç
+        id: update_word
+        env:
+          FORCE_UPDATE: ${{ github.event.inputs.force_update || 'false' }}
         run: |
-          node << 'EOF'
+          node << 'SCRIPT_END'
           const fs = require('fs');
-          
-          async function start() {
-            const GIST_URL = "https://gist.githubusercontent.com/Resinder/b2897fd639006e34a1bf54252d730f7b/raw/b29034e404094142bfeb896e7e8e5aa50b6db46f/tdk-5-harfli-kelimeler.json";
-            const FILE_NAME = 'gizli-kelime.json';
-            
-            const now = new Date();
-            // UTC yerine yerel saat karmaşasını önlemek için doğrudan saat değerini alalım
-            const currentHour = now.getUTCHours();
-            const currentDate = now.getUTCDate();
-            const currentHourKey = `H${currentHour}-D${currentDate}-M${now.getUTCMonth()}`;
+          const { GIST_URL, WORD_FILE } = process.env;
+          const FORCE_UPDATE = process.env.FORCE_UPDATE === 'true';
 
-            let data = { kelime: "", hourKey: "" };
-            if (fs.existsSync(FILE_NAME)) {
+          // Utility fonksiyonlar
+          const readJSON = (path) => {
+            try {
+              return fs.existsSync(path) ? JSON.parse(fs.readFileSync(path, 'utf8')) : null;
+            } catch (err) {
+              console.warn(`⚠️  JSON okuma hatası: ${err.message}`);
+              return null;
+            }
+          };
+
+          const writeJSON = (path, data) => {
+            fs.writeFileSync(path, JSON.stringify(data, null, 2) + '\n', 'utf8');
+          };
+
+          const fetchWithRetry = async (url, retries = 3) => {
+            for (let i = 0; i < retries; i++) {
               try {
-                data = JSON.parse(fs.readFileSync(FILE_NAME, 'utf-8'));
-              } catch (e) { console.log("Dosya okunamadı, yeni oluşturuluyor."); }
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return await response.json();
+              } catch (err) {
+                if (i === retries - 1) throw err;
+                console.log(`🔄 Yeniden deneniyor (${i + 1}/${retries})...`);
+                await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+              }
             }
+          };
 
-            // GÜNCELLEME MANTIĞI: Eğer kayıtlı hourKey mevcut saatle aynı DEĞİLSE güncelle
-            if (data.hourKey === currentHourKey) {
-              console.log(`>>> ${currentHour}:00 UTC kelimesi zaten mevcut. İşlem durduruldu.`);
-              process.exit(0);
+          // Ana işlem
+          (async () => {
+            try {
+              const now = new Date();
+              const currentHourKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}-${String(now.getUTCHours()).padStart(2, '0')}`;
+              const humanReadable = now.toISOString().replace('T', ' ').substring(0, 13) + ':00 UTC';
+
+              console.log(`\n⏰ Şu anki saat: ${humanReadable}`);
+              console.log(`🔑 Hour Key: ${currentHourKey}\n`);
+
+              // Mevcut veriyi oku
+              const currentData = readJSON(WORD_FILE) || { kelime: '', hourKey: '' };
+
+              // Zaten güncellenmiş mi kontrol et
+              if (!FORCE_UPDATE && currentData.hourKey === currentHourKey) {
+                console.log(`✅ ${humanReadable} için kelime zaten güncellenmiş`);
+                console.log(`📝 Mevcut kelime: ${currentData.kelime}\n`);
+                process.exit(0);
+              }
+
+              if (FORCE_UPDATE) {
+                console.log('⚡ Zorla güncelleme modu aktif\n');
+              }
+
+              // Kelime listesini indir
+              console.log('📡 Kelime listesi indiriliyor...');
+              const kelimeler = await fetchWithRetry(GIST_URL);
+              
+              if (!Array.isArray(kelimeler) || kelimeler.length === 0) {
+                throw new Error('Kelime listesi boş veya geçersiz');
+              }
+
+              console.log(`📚 ${kelimeler.length} kelime yüklendi\n`);
+
+              // Rastgele yeni kelime seç (öncekinden farklı)
+              let yeniKelime;
+              let attempts = 0;
+              const maxAttempts = 10;
+
+              do {
+                yeniKelime = kelimeler[Math.floor(Math.random() * kelimeler.length)]
+                  .toLocaleUpperCase('tr-TR');
+                attempts++;
+              } while (
+                yeniKelime === currentData.kelime && 
+                kelimeler.length > 1 && 
+                attempts < maxAttempts
+              );
+
+              // Yeni veriyi kaydet
+              const newData = {
+                kelime: yeniKelime,
+                saat: now.toISOString(),
+                hourKey: currentHourKey,
+                timestamp: now.getTime(),
+                oncekiKelime: currentData.kelime || null
+              };
+
+              writeJSON(WORD_FILE, newData);
+
+              console.log('✨ Güncelleme başarılı!');
+              console.log(`📝 Yeni kelime: ${yeniKelime}`);
+              if (currentData.kelime) {
+                console.log(`📋 Önceki kelime: ${currentData.kelime}`);
+              }
+              console.log('');
+
+              // GitHub Actions output
+              console.log(`::set-output name=word::${yeniKelime}`);
+              console.log(`::set-output name=changed::true`);
+
+            } catch (err) {
+              console.error('\n❌ Hata:', err.message);
+              console.error(err.stack);
+              process.exit(1);
             }
+          })();
+          SCRIPT_END
 
-            console.log(`>>> ${currentHour}:00 UTC için yeni kelime atanıyor...`);
-
-            const response = await fetch(GIST_URL);
-            const kelimeler = await response.json();
-            
-            let yeniKelime;
-            do {
-              yeniKelime = kelimeler[Math.floor(Math.random() * kelimeler.length)].toUpperCase('tr-TR');
-            } while (yeniKelime === data.kelime);
-
-            fs.writeFileSync(FILE_NAME, JSON.stringify({
-              kelime: yeniKelime,
-              saat: now.toISOString(),
-              hourKey: currentHourKey
-            }, null, 2));
-            
-            console.log(`>>> Yeni Kelime: ${yeniKelime}`);
-          }
-          start();
-          EOF
-
-      - name: Commit and Push
-        id: commit_step
+      - name: 💾 Değişiklikleri Kaydet
+        id: commit
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git add gizli-kelime.json
           
-          if ! git diff --cached --quiet; then
-            git commit -m "🔄 Kelime Guncellendi: $(date -u +'%H:00 UTC')"
-            git push origin main
-            echo "changed=true" >> $GITHUB_OUTPUT
-          else
-            echo "changed=false" >> $GITHUB_OUTPUT
+          git add "$WORD_FILE"
+          
+          if git diff --cached --quiet; then
+            echo "ℹ️  Değişiklik yok, commit atlanıyor"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            exit 0
           fi
+          
+          COMMIT_MSG="🔄 Kelime güncellendi: $(date -u +'%Y-%m-%d %H:00 UTC')"
+          
+          git commit -m "$COMMIT_MSG"
+          git pull --rebase origin main || true
+          git push origin main
+          
+          echo "✅ Değişiklikler push edildi"
+          echo "has_changes=true" >> $GITHUB_OUTPUT
 
-      - name: Deploy to GitHub Pages
-        if: steps.commit_step.outputs.changed == 'true'
+      - name: 📦 GitHub Pages Hazırla
+        if: steps.commit.outputs.has_changes == 'true'
+        uses: actions/configure-pages@v4
+
+      - name: 📤 Artifact Yükle
+        if: steps.commit.outputs.has_changes == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: 🚀 GitHub Pages Deploy
+        if: steps.commit.outputs.has_changes == 'true'
+        id: deploy
         uses: actions/deploy-pages@v4
-        # Not: deploy-pages kullanmak için önce sayfayı build etmeniz veya upload etmeniz gerekir. 
-        # Ancak en sağlıklı yol GitHub Pages ayarlarından "Deploy from Branch" seçip "main"i seçmektir.
+
+      - name: 📊 Özet
+        if: always()
+        run: |
+          echo "## 📈 Çalıştırma Özeti" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tarih:** $(date -u +'%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tetikleyici:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.commit.outputs.has_changes }}" == "true" ]; then
+            echo "- **Durum:** ✅ Kelime güncellendi ve deploy edildi" >> $GITHUB_STEP_SUMMARY
+            if [ -n "${{ steps.update_word.outputs.word }}" ]; then
+              echo "- **Yeni Kelime:** ${{ steps.update_word.outputs.word }}" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- **Durum:** ℹ️  Güncelleme gerekmedi" >> $GITHUB_STEP_SUMMARY
+          fi

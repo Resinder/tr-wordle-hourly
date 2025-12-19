@@ -1,36 +1,24 @@
-name: Hourly Word (Strict Timing) & Deploy
+name: Hourly Word (Reliable Update) & Deploy
 
 on:
   schedule:
-    # Her 5 dakikada bir tetiklenerek saat başını kaçırmamayı sağlar
-    - cron: '*/5 * * * *' 
+    # GitHub gecikmelerini kompanse etmek için her 5 dakikada bir kontrol et
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 concurrency:
   group: "word-update"
-  cancel-in-progress: true
-
-permissions:
-  contents: write
-  pages: write
-  id-token: write
+  cancel-in-progress: false # Devam eden süreci iptal etme, Pages deploy bitsin
 
 jobs:
   check-and-update:
     runs-on: ubuntu-latest
-    outputs:
-      HAS_CHANGES: ${{ steps.commit_step.outputs.changed }}
-    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Process Word Update
         id: process_step
@@ -43,52 +31,41 @@ jobs:
             const FILE_NAME = 'gizli-kelime.json';
             
             const now = new Date();
-            const currentHourKey = `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}-${now.getUTCHours()}`;
+            // UTC yerine yerel saat karmaşasını önlemek için doğrudan saat değerini alalım
+            const currentHour = now.getUTCHours();
+            const currentDate = now.getUTCDate();
+            const currentHourKey = `H${currentHour}-D${currentDate}-M${now.getUTCMonth()}`;
 
-            try {
-              let data = { kelime: "", hourKey: "" };
-              if (fs.existsSync(FILE_NAME)) {
-                try {
-                  data = JSON.parse(fs.readFileSync(FILE_NAME, 'utf-8'));
-                } catch (e) { console.log("Dosya sifirlaniyor."); }
-              }
-
-              // KRİTİK KONTROL: Eğer bu saat için zaten güncelleme yapılmışsa dur.
-              if (data.hourKey === currentHourKey) {
-                console.log(`>>> Saat ${now.getUTCHours()}:00 icin zaten guncelleme yapilmis. Bekleniyor...`);
-                process.exit(0);
-              }
-
-              // Sadece saatin ilk 10 dakikası içinde veya manuel tetiklendiğinde çalışması için ek koruma
-              // Bu sayede GitHub gecikse bile saatin başında işlem yapmaya zorlanır.
-              console.log(`>>> Yeni saat algilandi: ${currentHourKey}. Kelime degistiriliyor...`);
-
-              let response;
-              for (let i = 0; i < 3; i++) {
-                try {
-                  response = await fetch(GIST_URL);
-                  if (response.ok) break;
-                } catch (e) { if (i === 2) throw e; }
-              }
-
-              const kelimeler = await response.json();
-              let yeniKelime;
-              do {
-                yeniKelime = kelimeler[Math.floor(Math.random() * kelimeler.length)].toLocaleUpperCase('tr-TR');
-              } while (yeniKelime === data.kelime && kelimeler.length > 1);
-
-              fs.writeFileSync(FILE_NAME, JSON.stringify({
-                kelime: yeniKelime,
-                saat: now.toISOString(),
-                timestamp: now.getTime(),
-                hourKey: currentHourKey
-              }, null, 2));
-              
-              console.log(`>>> Basarili: ${yeniKelime}`);
-            } catch (err) {
-              console.error("Hata:", err.message);
-              process.exit(1);
+            let data = { kelime: "", hourKey: "" };
+            if (fs.existsSync(FILE_NAME)) {
+              try {
+                data = JSON.parse(fs.readFileSync(FILE_NAME, 'utf-8'));
+              } catch (e) { console.log("Dosya okunamadı, yeni oluşturuluyor."); }
             }
+
+            // GÜNCELLEME MANTIĞI: Eğer kayıtlı hourKey mevcut saatle aynı DEĞİLSE güncelle
+            if (data.hourKey === currentHourKey) {
+              console.log(`>>> ${currentHour}:00 UTC kelimesi zaten mevcut. İşlem durduruldu.`);
+              process.exit(0);
+            }
+
+            console.log(`>>> ${currentHour}:00 UTC için yeni kelime atanıyor...`);
+
+            const response = await fetch(GIST_URL);
+            const kelimeler = await response.json();
+            
+            let yeniKelime;
+            do {
+              yeniKelime = kelimeler[Math.floor(Math.random() * kelimeler.length)].toUpperCase('tr-TR');
+            } while (yeniKelime === data.kelime);
+
+            fs.writeFileSync(FILE_NAME, JSON.stringify({
+              kelime: yeniKelime,
+              saat: now.toISOString(),
+              hourKey: currentHourKey
+            }, null, 2));
+            
+            console.log(`>>> Yeni Kelime: ${yeniKelime}`);
           }
           start();
           EOF
@@ -101,24 +78,15 @@ jobs:
           git add gizli-kelime.json
           
           if ! git diff --cached --quiet; then
-            git commit -m "🔄 Saatlik Kelime Guncellendi: $(date -u +'%Y-%m-%d %H:00 UTC')"
-            git pull --rebase origin main
+            git commit -m "🔄 Kelime Guncellendi: $(date -u +'%H:00 UTC')"
             git push origin main
             echo "changed=true" >> $GITHUB_OUTPUT
           else
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Deployment Setup
-        if: steps.commit_step.outputs.changed == 'true'
-        uses: actions/configure-pages@v4
-
-      - name: Upload Artifacts
-        if: steps.commit_step.outputs.changed == 'true'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'
-
       - name: Deploy to GitHub Pages
         if: steps.commit_step.outputs.changed == 'true'
         uses: actions/deploy-pages@v4
+        # Not: deploy-pages kullanmak için önce sayfayı build etmeniz veya upload etmeniz gerekir. 
+        # Ancak en sağlıklı yol GitHub Pages ayarlarından "Deploy from Branch" seçip "main"i seçmektir.

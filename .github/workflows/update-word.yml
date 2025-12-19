@@ -41,7 +41,7 @@ jobs:
           node << 'EOF'
           const fs = require('fs');
           
-          const GIST_URL = 'https://gist.githubusercontent.com/Resinder/b2897fd639006e34a1bf64252d730f7b/raw/tdk-5-harfli-kelimeler.json';
+          const GIST_URL = 'https://gist.githubusercontent.com/Resinder/b2897fd639006e34a1bf54252d730f7b/raw/tdk-5-harfli-kelimeler.json';
           const FILE = 'gizli-kelime.json';
           const FORCE = process.env.FORCE_UPDATE === 'true';
           

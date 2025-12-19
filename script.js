@@ -255,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const m = document.createElement('div');
         m.className = `message ${type === 'nyan' ? 'nyan' : ''}`;
         m.innerHTML = type === 'nyan' 
-            ? `<img src="https://media.giphy.com/media/sIIhZUs2lzdzq/giphy.gif" width="30"> <span>${t}</span>`
+            ? `<img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExYXE2cTBkMXQ4NG9tajZoZmd5b3A3MDBxdTQ3NzZtMWFwZ3J1MXNlYiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/7lsw8RenVcjCM/giphy.gif" width="30"> <span>${t}</span>`
             : t;
         document.getElementById('message-container').appendChild(m);
         if (window.navigator.vibrate) window.navigator.vibrate(50);
